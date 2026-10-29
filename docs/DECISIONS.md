@@ -301,9 +301,10 @@ content. Source list uses trust-tier colors with a one-line legend above it.
   (one large JSON synthesis) with a bigger output token budget. Streaming
   would be a worthwhile next step; it was deferred to keep complexity down.
 - **Thinking-first Gemini models break the fast path.** `gemini-flash-latest`
-  (currently a thinking-first newer flash) returned empty text at reasonable
-  `maxOutputTokens`. The `.env.example` therefore recommends `gemini-2.5-flash`.
-  Documented in `docs/STATUS.md`.
+  (and reasoning models like `gemini-4-argon`) return empty text at reasonable
+  `maxOutputTokens` because they spend the budget on hidden thinking. The
+  `.env.example` therefore pins a NON-thinking model — `gemini-3.5-flash-lite`
+  (the tested default). Documented in `docs/STATUS.md`.
 - **Dependency vulnerability.** `postcss` has a high-severity advisory, pulled
   in transitively by Next 15. The fix requires Next 16 (breaking). Noted; not
   worth a mid-build upgrade.

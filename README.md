@@ -80,7 +80,7 @@ npm run dev                  # http://localhost:3000
 Environment variables (all server-side):
 
 - `GEMINI_API_KEY` — Gemini key (required)
-- `GEMINI_MODEL` — model id, e.g. `gemini-2.5-flash` (required)
+- `GEMINI_MODEL` — model id, e.g. `gemini-3.5-flash-lite` (required)
 - `TAVILY_API_KEY` — Tavily web-search key (required)
 - `DATABASE_PATH` — SQLite path, defaults to `./data/guides.db` (optional)
 
