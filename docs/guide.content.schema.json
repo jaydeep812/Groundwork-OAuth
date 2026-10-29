@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oauth-readiness.guide/schemas/guide.content.json",
+  "title": "OAuth Readiness Guide — Content Schema",
+  "description": "PM-authored content contract for a provider OAuth integration guide. This describes WHAT a guide must contain to let a developer decide-and-ship fast, organized around the developer's journey: Decide → Prepare → Build → Verify → Ship. It is the product spec for the guide payload; server plumbing fields (id, slug, timestamps, status, finding back-references) are intentionally omitted — see guide.content.README below. Every factual field follows the honesty contract: a value is present ONLY when backed by retrieved evidence; otherwise it is null/empty and surfaced as an open question. Never fabricate.",
+
+  "type": "object",
+  "required": [
+    "provider",
+    "decision",
+    "effort",
+    "implementation",
+    "setupSteps",
+    "nextAction",
+    "confidence"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+    "provider": {
+      "description": "WHO this guide is about. First thing a developer confirms they're on the right page.",
+      "type": "object",
+      "required": ["name", "url", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "description": "Human provider name, e.g. 'Notion'." },
+        "url": { "type": "string", "format": "uri", "description": "Provider's own homepage/docs root. http(s) only. Null-equivalent: a search URL when the real one wasn't established — the UI must label that honestly." },
+        "summary": { "type": "string", "minLength": 1, "description": "One-paragraph 'what is this and what can I build with it' — scannable in 5 seconds." },
+        "logoUrl": { "type": ["string", "null"], "format": "uri", "description": "Optional brand logo for the card/header. Recognition speeds scanning in the library. Null when not found." }
+      }
+    },
+
+    "decision": {
+      "description": "DECIDE. The single most important block: which path should I take, and is it worth starting now? A developer should be able to make a go/no-go call from this alone.",
+      "type": "object",
+      "required": ["recommendedPath", "rationale", "difficulty"],
+      "additionalProperties": false,
+      "properties": {
+        "recommendedPath": {
+          "type": "string",
+          "enum": ["managed-auth", "custom-oauth", "other"],
+          "description": "managed-auth = use Composio's managed connection (least work); custom-oauth = register your own provider OAuth app; other = a justified non-OAuth route (explain in rationale)."
+        },
+        "rationale": { "type": "string", "minLength": 1, "description": "WHY this path, in plain language. Must reference what was actually observed, not generic advice." },
+        "difficulty": {
+          "type": "object",
+          "required": ["rating", "rationale"],
+          "additionalProperties": false,
+          "properties": {
+            "rating": { "type": "string", "enum": ["easy", "moderate", "hard", "unknown"] },
+            "rationale": { "type": "string", "minLength": 1 }
+          }
+        },
+        "alternativePaths": {
+          "description": "Optional. Other viable routes with a one-line trade-off each, so the developer sees the decision space, not just the verdict.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": ["path", "tradeoff"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "enum": ["managed-auth", "custom-oauth", "other"] },
+              "tradeoff": { "type": "string", "minLength": 1, "description": "e.g. 'More control, but you own token refresh and app review.'" }
+            }
+          }
+        }
+      }
+    },
+
+    "effort": {
+      "description": "DECIDE (cost). Keep hands-on work separate from waiting-on-others — a developer plans very differently for '2 hours of coding' vs '3 days waiting for app review'.",
+      "type": "object",
+      "required": ["activeWork", "externalWaiting"],
+      "additionalProperties": false,
+      "properties": {
+        "activeWork": { "$ref": "#/$defs/estimate", "description": "Hands-on developer time to implement." },
+        "externalWaiting": { "$ref": "#/$defs/estimate", "description": "Calendar time blocked on the provider (review, verification, approval)." }
+      }
+    },
+
+    "prerequisites": {
+      "description": "PREPARE. What must already be true before step 1 — accounts, plans, entitlements. Prevents the developer starting and hitting a wall three steps in.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["description"],
+        "additionalProperties": false,
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "evidence": { "$ref": "#/$defs/evidenceList" }
+        }
+      }
+    },
+
+    "implementation": {
+      "description": "BUILD (reference). The copy-pasteable core: the concrete OAuth facts a developer wires into code. This is the single highest-value block for speed — endpoints, scopes, PKCE, token lifetime, limits. Honesty contract is strict here: a URL appears ONLY if quoted in authoritative evidence; otherwise null, never a pattern-guess.",
+      "type": "object",
+      "required": ["pkce"],
+      "additionalProperties": false,
+      "properties": {
+        "developerPortalUrl": { "type": ["string", "null"], "format": "uri", "description": "Where to register the app." },
+        "authorizeUrl": { "type": ["string", "null"], "format": "uri", "description": "OAuth authorization endpoint." },
+        "tokenUrl": { "type": ["string", "null"], "format": "uri", "description": "Token exchange endpoint." },
+        "refreshUrl": { "type": ["string", "null"], "format": "uri", "description": "Token refresh endpoint (often same as tokenUrl)." },
+        "revokeUrl": { "type": ["string", "null"], "format": "uri", "description": "Token revocation endpoint." },
+        "scopes": {
+          "type": "array",
+          "default": [],
+          "description": "OAuth scopes relevant to the stated use case. Empty is valid and meaningful (provider may not use scopes) — say so in an open question.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "default": "" },
+              "required": { "type": "boolean", "default": false, "description": "Required for the stated use case." },
+              "evidence": { "$ref": "#/$defs/evidenceList" }
+            }
+          }
+        },
+        "redirectUriRule": { "type": "string", "default": "", "description": "FORMAT/constraints of the redirect URI (e.g. 'https only except http://localhost; must exactly match a registered value') — never a fabricated literal." },
+        "pkce": { "type": "string", "enum": ["required", "supported", "not-supported", "unknown"], "default": "unknown" },
+        "tokenLifetime": { "oneOf": [{ "$ref": "#/$defs/estimate" }, { "type": "null" }], "description": "Access-token lifetime." },
+        "rateLimits": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": ["limit"],
+            "additionalProperties": false,
+            "properties": {
+              "limit": { "type": "string", "minLength": 1, "description": "Kept as a string — providers phrase limits many ways; never coerce into a fabricated number." },
+              "window": { "type": "string", "default": "", "description": "e.g. 'per second', 'per minute per user'." },
+              "scope": { "type": "string", "default": "", "description": "What it applies to, e.g. 'order placement'." },
+              "note": { "type": "string", "default": "" },
+              "evidence": { "$ref": "#/$defs/evidenceList" }
+            }
+          }
+        },
+        "testMode": { "type": "string", "default": "", "description": "Sandbox / dev-workspace availability for testing without going to production." },
+        "evidence": { "$ref": "#/$defs/evidenceList" }
+      }
+    },
+
+    "setupSteps": {
+      "description": "BUILD (do). The ordered, actionable spine of the guide, grouped by phase. This is the centerpiece a developer executes top-to-bottom. Each step is self-contained: what to do, what should happen, how to confirm, and what to do if it breaks.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["title", "phase", "instructions", "executionMode"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "phase": {
+            "type": "string",
+            "enum": ["register-provider-app", "configure-integration", "authorize-user", "verify-data-access", "provider-approval"],
+            "description": "Drives the journey grouping. Ordered as listed."
+          },
+          "instructions": { "type": "string", "minLength": 1, "description": "Concrete: where to go, what to click/enter." },
+          "rationale": { "type": "string", "default": "", "description": "Why this step matters (optional, builds trust/understanding)." },
+          "required": { "type": "boolean", "default": true },
+          "appliesWhen": { "type": ["string", "null"], "default": null, "description": "Condition under which this conditional step applies, e.g. 'only for multi-tenant apps'." },
+          "fields": {
+            "description": "Configuration values this step asks the developer to supply/collect. The product's anti-footgun layer: it labels WHERE each value comes from and never asks for or stores secrets.",
+            "type": "array",
+            "default": [],
+            "items": { "$ref": "#/$defs/setupField" }
+          },
+          "expectedOutcome": { "type": "string", "default": "", "description": "What success looks like after this step." },
+          "verification": { "type": "string", "default": "", "description": "How to confirm it actually worked." },
+          "recovery": { "type": "string", "default": "", "description": "What to do if it fails (the step the developer actually needs at 2am)." },
+          "executionMode": {
+            "type": "string",
+            "enum": ["manual", "agent-assisted", "automatable"],
+            "description": "Who/what performs this — sets expectation for the agent-vs-human split."
+          },
+          "evidence": { "$ref": "#/$defs/evidenceList" }
+        }
+      }
+    },
+
+    "agentVsHuman": {
+      "description": "BUILD (division of labor). This product is for connecting providers to AI AGENTS, so a developer specifically wants to know: what can my agent do unattended vs what needs a human once. Omit entirely rather than guess.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agentCanHandle": { "type": "array", "default": [], "items": { "type": "string" } },
+        "needsHuman": { "type": "array", "default": [], "items": { "type": "string" } }
+      }
+    },
+
+    "approvalRequirements": {
+      "description": "SHIP. Provider review / verification / distribution gates that stand between 'works in testing' and 'works for real users'. Surfaced separately because they carry calendar time, not code time.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["title", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "required": { "type": "boolean", "default": true, "description": "Hard requirement vs conditional." },
+          "timeline": { "oneOf": [{ "$ref": "#/$defs/estimate" }, { "type": "null" }] },
+          "evidence": { "$ref": "#/$defs/evidenceList" }
+        }
+      }
+    },
+
+    "knownBlockers": {
+      "description": "SHIP (risk). Things that will stop or slow a developer — hard dependencies, gotchas, rate-limit cliffs. Shown prominently; the single worst one is promoted into the decision area.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["title", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["blocker", "warning", "note"], "default": "warning", "description": "PM addition: lets the UI rank and color blockers instead of treating all equally." },
+          "description": { "type": "string", "minLength": 1 },
+          "evidence": { "$ref": "#/$defs/evidenceList" }
+        }
+      }
+    },
+
+    "nextAction": {
+      "description": "START HERE. The one clearest first move, so a developer who's convinced can act immediately without re-reading the whole guide.",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "openQuestions": {
+      "description": "TRUST. What the research could NOT establish, stated as questions with how to resolve them. Preserving uncertainty honestly is a product differentiator — a guide that admits gaps beats one that bluffs.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["question"],
+        "additionalProperties": false,
+        "properties": {
+          "question": { "type": "string", "minLength": 1 },
+          "howToResolve": { "type": "string", "default": "", "description": "Concrete next step to close the gap (e.g. 'check the Composio toolkit catalog')." }
+        }
+      }
+    },
+
+    "sources": {
+      "description": "TRUST. Every source consulted, tiered by authority so a developer can weigh claims. The thing that makes this an 'evidence-backed' guide rather than an LLM opinion.",
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/source" }
+    },
+
+    "confidence": {
+      "description": "TRUST (at-a-glance). A single honest signal of how grounded this guide is, so the reader calibrates before trusting it.",
+      "type": "object",
+      "required": ["level", "basis"],
+      "additionalProperties": false,
+      "properties": {
+        "level": { "type": "string", "enum": ["high", "medium", "low"], "description": "high = key facts on authoritative sources; low = mostly third-party/community or many open questions." },
+        "basis": { "type": "string", "minLength": 1, "description": "One line explaining the level, e.g. 'Endpoints confirmed on provider docs; token lifetime unestablished.'" }
+      }
+    }
+  },
+
+  "$defs": {
+    "estimate": {
+      "description": "An honest time/quantity estimate. kind states how we know; value/unit are null when genuinely unknown (and must be rendered as 'Unknown', not zero).",
+      "type": "object",
+      "required": ["kind", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["verified", "observed", "estimate", "inference", "unknown"] },
+        "value": { "type": ["number", "null"], "default": null },
+        "unit": { "type": ["string", "null"], "enum": ["minutes", "hours", "days", null], "default": null },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidence": { "$ref": "#/$defs/evidenceList" }
+      }
+    },
+    "setupField": {
+      "type": "object",
+      "required": ["label", "provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean", "default": true },
+        "description": { "type": "string", "default": "", "description": "What the provider expects for this field." },
+        "provenance": {
+          "type": "string",
+          "enum": ["developer-input", "environment-derived", "provider-issued"],
+          "description": "Where the value comes from. developer-input = you choose it; environment-derived = from your own app (e.g. redirect URI); provider-issued = the provider gives it to you (e.g. client id). The product NEVER stores provider-issued secrets."
+        },
+        "suggestedValue": { "type": ["string", "null"], "default": null, "description": "A copyable literal ONLY when quoted in authoritative evidence; null otherwise. Never a secret." },
+        "validation": { "type": "string", "default": "", "description": "How to validate the entered value." }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["title", "url", "sourceType"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "snippet": { "type": "string", "default": "", "description": "Short supporting quote." },
+        "sourceType": {
+          "type": "string",
+          "enum": ["official-docs", "developer-portal", "composio-docs", "third-party-integration", "community", "unknown"],
+          "description": "Authority tier. official-docs / developer-portal are credited ONLY when on the provider's own domain. This tiering is what lets the reader trust (or discount) each claim."
+        }
+      }
+    },
+    "evidenceList": {
+      "description": "Inline citations for a claim: the sources that back it. Empty means the claim is asserted without a cited source — the UI should treat that as weaker.",
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/source" }
+    }
+  }
+}

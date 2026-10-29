@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/*
+ * Lab-paper dossier — a light "technical report" surface where verifiability is
+ * the visual. Warm paper stock, true near-black ink, hairline warm-grey rules,
+ * and a single scarce semantic accent: deep green = evidence-backed / verified.
+ *   Display: Fraunces (editorial soft-serif) · Body/UI: IBM Plex Sans · Code: IBM Plex Mono
+ */
+
+:root {
+  --paper: #fbfaf7; /* warm report stock (not SaaS white, not AI-cream) */
+  --paper-raised: #f4f2ec; /* subtly recessed panels / code blocks */
+  --ink: #1a1c1f; /* true near-black ink */
+  --slate: #5a5e66; /* secondary ink */
+  --faint: #8c8f96; /* tertiary / captions */
+  --rule: #e4e1d9; /* hairline rules & borders (warm grey) */
+  --rule-strong: #d3cfc4;
+
+  --verified: #1f6f4a; /* deep green — grounded/confirmed. THE accent. scarce. */
+  --verified-soft: #eef4ef; /* green tint for verified chips */
+  --open: #9a6a00; /* amber ochre — unverified / open question */
+  --open-soft: #f6efdf;
+  --alert: #a3341f; /* rust — blockers (semantic only) */
+  --alert-soft: #f6e9e5;
+}
+
+@theme {
+  /* One clean geometric sans for everything; mono for code only.
+     --font-display is kept as an alias to the sans so any remaining
+     `font-display` utilities resolve correctly after the serif was dropped. */
+  --font-sans:
+    var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+
+  /* Remap Tailwind's neutral/white/indigo scales to the lab-paper palette so
+     existing utility classes render correctly without editing every call site.
+     Light surface: low index = light, high index = dark ink. */
+  --color-white: #ffffff; /* real white cards sit slightly above paper */
+
+  --color-neutral-50: #faf9f5;
+  --color-neutral-100: #f4f2ec; /* raised panels */
+  --color-neutral-200: #e4e1d9; /* rules / borders */
+  --color-neutral-300: #d3cfc4; /* stronger rules */
+  --color-neutral-400: #8c8f96; /* faint text */
+  --color-neutral-500: #6f7379;
+  --color-neutral-600: #5a5e66; /* secondary ink */
+  --color-neutral-700: #3b3e43; /* body ink */
+  --color-neutral-800: #26282c;
+  --color-neutral-900: #1a1c1f; /* headings / primary ink */
+
+  /* "indigo" utilities map to the verified-green accent (semantic links/marks). */
+  --color-indigo-50: #eef4ef;
+  --color-indigo-100: #d9e8df;
+  --color-indigo-200: #b4d2c0;
+  --color-indigo-300: #6fa988;
+  --color-indigo-400: #2f8a5e;
+  --color-indigo-500: #1f6f4a;
+  --color-indigo-600: #1f6f4a;
+  --color-indigo-700: #185a3c;
+
+  --radius-sm: 4px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--verified);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
