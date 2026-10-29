@@ -72,12 +72,13 @@ export function GuideTabs({
 
   return (
     <div className="space-y-8">
-      {/* Persistent tab bar. Horizontal-scrollable on narrow screens so labels
-          never wrap or overflow awkwardly. */}
+      {/* Persistent, sticky tab bar. Stays reachable on long guide pages;
+          horizontal-scrollable on narrow screens so labels never overflow. The
+          paper background keeps content from showing through when pinned. */}
       <div
         role="tablist"
         aria-label="Guide sections"
-        className="-mx-1 flex gap-1 overflow-x-auto border-b border-[color:var(--rule)] px-1"
+        className="sticky top-0 z-20 -mx-1 flex gap-1 overflow-x-auto border-b border-[color:var(--rule)] bg-[color:var(--paper)]/95 px-1 backdrop-blur supports-[backdrop-filter]:bg-[color:var(--paper)]/80"
       >
         {TABS.map((t) => {
           const isActive = t.key === active;

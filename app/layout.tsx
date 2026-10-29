@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Geist, IBM_Plex_Mono } from "next/font/google";
+import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Clean geometric sans for everything (headings + body), matching the reference.
-// IBM Plex Mono stays for code only.
-const geist = Geist({
+// Space Grotesk carries the display/headings — engineered letterforms that give
+// the product a measured, technical voice without reading as a generic
+// geometric sans. IBM Plex Sans handles body/UI prose, and IBM Plex Mono stays
+// for code and data readings; the two Plex faces cohere as one family.
+const display = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+});
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-sans",
@@ -24,22 +31,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${plexMono.variable}`}>
       <body className="min-h-screen font-sans">
         <header className="border-b border-[color:var(--rule)]">
           <div className="mx-auto flex max-w-[1180px] items-center justify-between px-6 py-4">
-            <Link href="/" className="text-[18px] font-semibold tracking-tight text-[color:var(--ink)]">
+            <Link href="/" className="font-display text-[19px] font-semibold tracking-tight text-[color:var(--ink)]">
               Groundwork
             </Link>
-            <nav className="flex items-center gap-6 text-[15px]">
+            <nav className="flex items-center gap-6 text-[length:var(--text-body)]">
               <Link href="/" className="text-[color:var(--slate)] transition-colors hover:text-[color:var(--ink)]">
                 Library
               </Link>
               <Link
-                href="/investigate"
-                className="rounded-lg bg-[color:var(--ink)] px-4 py-2 text-[14px] font-medium text-[color:var(--paper)] transition-colors hover:bg-black"
+                href="/#top"
+                className="rounded-lg bg-[color:var(--ink)] px-4 py-2 text-[length:var(--text-body)] font-medium text-[color:var(--paper)] transition-colors hover:bg-black"
               >
-                Investigate a provider
+                Find a guide
               </Link>
             </nav>
           </div>

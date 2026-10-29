@@ -109,7 +109,7 @@ export function ImplementationPack({
         <div className="space-y-1">
           <FieldLabel>Redirect URI format</FieldLabel>
           {i.redirectUriRule ? (
-            <p className="text-sm text-neutral-700">{i.redirectUriRule}</p>
+            <p className="text-sm leading-relaxed text-[color:var(--ink)]">{i.redirectUriRule}</p>
           ) : (
             <NotEstablished>Redirect URI format not established.</NotEstablished>
           )}
@@ -136,7 +136,7 @@ export function ImplementationPack({
       {i.appReadiness?.distribution && (
         <div className="space-y-1">
           <FieldLabel>App distribution</FieldLabel>
-          <p className="text-sm text-neutral-700">{i.appReadiness.distribution}</p>
+          <p className="text-sm leading-relaxed text-[color:var(--ink)]">{i.appReadiness.distribution}</p>
         </div>
       )}
 
@@ -145,7 +145,7 @@ export function ImplementationPack({
         <div className="space-y-1">
           <FieldLabel>Access token lifetime</FieldLabel>
           {i.tokenLifetime ? (
-            <p className="flex items-center gap-2 text-sm text-neutral-700">
+            <p className="flex items-center gap-2 text-sm text-[color:var(--ink)]">
               {formatEstimate(i.tokenLifetime)}
               <ClaimKindBadge kind={i.tokenLifetime.kind} />
             </p>
@@ -156,7 +156,7 @@ export function ImplementationPack({
         {i.testMode && (
           <div className="space-y-1">
             <FieldLabel>Test / sandbox mode</FieldLabel>
-            <p className="text-sm text-neutral-700">{i.testMode}</p>
+            <p className="text-sm leading-relaxed text-[color:var(--ink)]">{i.testMode}</p>
           </div>
         )}
       </div>
@@ -198,10 +198,12 @@ export function ImplementationPack({
 function EndpointRow({ label, url }: { label: string; url: string | null }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-36 shrink-0 text-sm font-medium text-neutral-700">{label}</span>
+      <span className="w-36 shrink-0 text-[length:var(--text-secondary)] font-medium text-[color:var(--slate)]">
+        {label}
+      </span>
       {url ? (
         <>
-          <code className="min-w-0 flex-1 truncate rounded bg-neutral-200 px-2 py-1 font-mono text-xs text-neutral-800">
+          <code className="min-w-0 flex-1 truncate rounded-md border border-[color:var(--rule)] bg-[color:var(--paper)] px-2.5 py-1.5 font-mono text-xs text-[color:var(--ink)]">
             {url}
           </code>
           <CopyButton value={url} />
@@ -209,9 +211,9 @@ function EndpointRow({ label, url }: { label: string; url: string | null }) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-indigo-600 underline"
+            className="inline-flex items-center gap-1 rounded-md border border-[color:var(--rule-strong)] px-2 py-1 text-xs text-[color:var(--slate)] transition-colors hover:border-[color:var(--faint)] hover:text-[color:var(--ink)]"
           >
-            open
+            Open <span aria-hidden>↗</span>
           </a>
         </>
       ) : (
@@ -222,14 +224,12 @@ function EndpointRow({ label, url }: { label: string; url: string | null }) {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[13px] font-medium text-[color:var(--faint)]">{children}</p>;
+  return <p className="text-[12px] font-semibold text-[color:var(--slate)]">{children}</p>;
 }
 
 function NotEstablished({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[color:var(--rule)] bg-[color:var(--paper)] px-2 py-0.5 text-xs text-[color:var(--faint)]">
-      {children}
-    </span>
+    <span className="text-xs italic text-[color:var(--faint)]">{children}</span>
   );
 }
 
@@ -259,8 +259,8 @@ function TokenLifecycleRow({
       <dl className="divide-y divide-[color:var(--rule)] border-y border-[color:var(--rule)] text-sm">
         {items.map((it) => (
           <div key={it.label} className="grid grid-cols-[9rem_1fr] gap-x-4 py-1.5">
-            <dt className="text-[color:var(--faint)]">{it.label}</dt>
-            <dd className="text-neutral-700">{it.value}</dd>
+            <dt className="text-[color:var(--slate)]">{it.label}</dt>
+            <dd className="text-[color:var(--ink)]">{it.value}</dd>
           </div>
         ))}
       </dl>

@@ -14,7 +14,6 @@ import { AuditLog, WhyWeKnow } from "@/components/why-we-know";
 import { ImplementationPack } from "@/components/implementation-pack";
 import { AgentPromptCard } from "@/components/agent-prompt-card";
 import { ManagedAuthCallout } from "@/components/managed-auth-callout";
-import { OAuthJourney } from "@/components/oauth-journey";
 import { Capabilities } from "@/components/capabilities";
 import { GuideTabs } from "@/components/guide-tabs";
 import { Linkify } from "@/components/ui/linkify";
@@ -206,18 +205,13 @@ function SetupPanel({
 }
 
 /**
- * TECHNICAL — implementation details for developers who need them, without
- * crowding the main setup path. The implementation pack (endpoints, flows,
- * scopes, redirect rule, PKCE, token lifecycle, rate limits) plus the
- * deterministic OAuth code walkthrough. Confirmed/estimate/unknown are
- * visually distinguished within each.
+ * TECHNICAL — the implementation reference: endpoints, flows, scopes (+ the
+ * provider's full advertised catalog), redirect rule, PKCE, token lifecycle, and
+ * rate limits, as copyable values. The step-by-step code now lives inline in the
+ * Setup checklist (one place, no double-narration of the flow).
  */
 function TechnicalPanel({ guide }: { guide: Guide }) {
-  const hasJourney =
-    guide.journey.length > 0 &&
-    Boolean(guide.implementation?.authorizeUrl || guide.implementation?.tokenUrl);
-
-  if (!guide.implementation && !hasJourney) {
+  if (!guide.implementation) {
     return (
       <p className="rounded-md border border-[color:var(--rule)] bg-[color:var(--paper-raised)] px-4 py-3 text-sm text-[color:var(--slate)]">
         No technical OAuth facts established yet. See the Evidence tab for what the research
@@ -228,16 +222,7 @@ function TechnicalPanel({ guide }: { guide: Guide }) {
 
   return (
     <div className="space-y-10">
-      {guide.implementation && (
-        <ImplementationPack implementation={guide.implementation} findings={guide.findings} />
-      )}
-      {hasJourney && (
-        <OAuthJourney
-          steps={guide.journey}
-          title="Implementation walkthrough"
-          subtitle="The code behind the setup checklist — the OAuth flow with real values for this provider."
-        />
-      )}
+      <ImplementationPack implementation={guide.implementation} findings={guide.findings} />
     </div>
   );
 }
@@ -380,54 +365,18 @@ function HeroSummary({
 }) {
   return (
     <section className="space-y-6">
-      {/* The decision card — the focal point. The verdict as a sentence. */}
-      <div className="rounded-lg border border-[color:var(--rule)] bg-[color:var(--paper-raised)] p-7">
-        <p className="text-[13px] text-[color:var(--faint)]">Recommended path</p>
-        <span className="mt-1.5 block text-[1.9rem] font-semibold leading-tight tracking-tight text-[color:var(--ink)]">
-          {pathTitle(guide.recommendedPath)}
-        </span>
-        <p className="mt-3 max-w-[44rem] text-[1.0625rem] leading-relaxed text-[color:var(--slate)]">
+      {/* Why this path — a short lead, not a boxed restatement of the badge. */}
+      {guide.pathRationale && (
+        <p className="max-w-[44rem] text-[length:var(--text-card)] leading-relaxed text-[color:var(--slate)]">
           <Linkify text={guide.pathRationale} />
         </p>
-      </div>
+      )}
 
-      {/* Facts as a definition list — not three identical stat cards. */}
-      <dl className="divide-y divide-[color:var(--rule)] border-y border-[color:var(--rule)]">
-        <FactRow
-          term="What this takes"
-          value={formatEstimate(guide.activeEffort)}
-          detail={guide.activeEffort.rationale}
-          findings={guide.findings}
-          findingIds={guide.activeEffort.findingIds ?? []}
-        />
-        <FactRow
-          term="Waiting on the provider"
-          value={formatEstimate(guide.externalWaiting)}
-          detail={guide.externalWaiting.rationale}
-          findings={guide.findings}
-          findingIds={guide.externalWaiting.findingIds ?? []}
-        />
-        <FactRow
-          term="Watch out for"
-          value={
-            mainBlocker
-              ? mainBlocker.title
-              : guide.blockerAssessment === "assessed-none-found"
-                ? "Nothing launch-blocking"
-                : "Blockers not fully assessed"
-          }
-          detail={
-            mainBlocker
-              ? mainBlocker.description
-              : guide.blockerAssessment === "assessed-none-found"
-                ? "None found after assessment."
-                : "Not fully assessed — verify in the provider's docs before launch."
-          }
-          tone={mainBlocker ? "alert" : guide.blockerAssessment === "assessed-none-found" ? "default" : "alert"}
-          findings={guide.findings}
-          findingIds={mainBlocker?.findingIds ?? []}
-        />
-      </dl>
+      {/* At-a-glance verdict — the three answers a developer wants in one look:
+          hands-on time, approval wait, and blocker risk. Each card folds its own
+          rationale + "why we know" into a disclosure, so the glance value and
+          the depth live in ONE place (no duplicate definition list below). */}
+      <VerdictRow guide={guide} mainBlocker={mainBlocker} />
 
       {guide.nextAction && (
         <div className="rounded-md border-l-2 border-[color:var(--verified)] bg-[color:var(--verified-soft)] px-4 py-3">
@@ -451,47 +400,123 @@ function HeroSummary({
   );
 }
 
-function FactRow({
-  term,
-  value,
-  detail,
-  tone = "default",
-  findings,
-  findingIds,
+/**
+ * At-a-glance verdict: three stat blocks answering "how long is this, how long
+ * will the provider make me wait, and what could block launch" — the dev's
+ * first three questions, legible in one glance. Each block names the claim kind
+ * (verified / estimate / unknown) so the confidence is never hidden.
+ */
+function VerdictRow({
+  guide,
+  mainBlocker,
 }: {
-  term: string;
-  value: string;
-  detail: string;
-  tone?: "default" | "alert";
-  findings: Guide["findings"];
-  findingIds: string[];
+  guide: Guide;
+  mainBlocker: Guide["knownBlockers"][number] | null;
 }) {
+  const effort = guide.activeEffort;
+  const waiting = guide.externalWaiting;
+
+  const blocker =
+    mainBlocker != null
+      ? { value: "Review needed", qualifier: "blocker", tone: "alert" as const }
+      : guide.blockerAssessment === "assessed-none-found"
+        ? { value: "Clear", qualifier: "assessed", tone: "verified" as const }
+        : { value: "Unverified", qualifier: "check docs", tone: "open" as const };
+
+  const waitingUnknown = waiting.kind === "unknown" || waiting.value == null;
+
+  const toneColor = (t: "ink" | "verified" | "open" | "alert") =>
+    t === "verified"
+      ? "var(--verified)"
+      : t === "open"
+        ? "var(--open)"
+        : t === "alert"
+          ? "var(--alert)"
+          : "var(--ink)";
+
   return (
-    <div className="grid grid-cols-[11rem_1fr] gap-x-6 gap-y-1 py-3.5 sm:grid-cols-[13rem_1fr]">
-      <dt className="text-[14px] text-[color:var(--faint)]">{term}</dt>
-      <dd
-        className={`text-[15px] font-medium ${
-          tone === "alert" ? "text-[color:var(--alert)]" : "text-[color:var(--ink)]"
-        }`}
-      >
-        {value}
-      </dd>
-      {(detail || findingIds.length > 0) && (
-        <dd className="col-start-2 space-y-1.5">
-          {detail && <p className="text-[14px] leading-relaxed text-[color:var(--slate)]">{detail}</p>}
-          {findingIds.length > 0 && <WhyWeKnow findings={findings} findingIds={findingIds} />}
-        </dd>
-      )}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <VerdictStat
+        label="Hands-on time"
+        value={formatEstimate(effort)}
+        qualifier={effort.kind}
+        color={toneColor("ink")}
+        detail={effort.rationale}
+        findings={guide.findings}
+        findingIds={effort.findingIds ?? []}
+      />
+      <VerdictStat
+        label="Approval wait"
+        value={waitingUnknown ? "None found" : formatEstimate(waiting)}
+        qualifier={waitingUnknown ? "assessed" : waiting.kind}
+        color={toneColor(waitingUnknown ? "verified" : "ink")}
+        detail={waiting.rationale}
+        findings={guide.findings}
+        findingIds={waiting.findingIds ?? []}
+      />
+      <VerdictStat
+        label="Launch blockers"
+        value={blocker.value}
+        qualifier={blocker.qualifier}
+        color={toneColor(blocker.tone)}
+        detail={
+          mainBlocker
+            ? mainBlocker.description
+            : guide.blockerAssessment === "assessed-none-found"
+              ? "None found after assessment."
+              : "Not fully assessed — verify in the provider's docs before launch."
+        }
+        findings={guide.findings}
+        findingIds={mainBlocker?.findingIds ?? []}
+      />
     </div>
   );
 }
 
-function pathTitle(path: Guide["recommendedPath"]): string {
-  return path === "managed-auth"
-    ? "Composio Managed Auth"
-    : path === "custom-oauth"
-      ? "Custom OAuth app"
-      : "Custom integration";
+function VerdictStat({
+  label,
+  value,
+  qualifier,
+  color,
+  detail,
+  findings,
+  findingIds,
+}: {
+  label: string;
+  value: string;
+  qualifier: string;
+  color: string;
+  detail?: string;
+  findings?: Guide["findings"];
+  findingIds?: string[];
+}) {
+  const hasWhy = Boolean(findings && findingIds && findingIds.length > 0);
+  return (
+    <div className="flex flex-col rounded-lg border border-[color:var(--rule)] bg-[color:var(--paper-raised)] px-4 py-3.5">
+      <div className="text-[length:var(--text-meta)] text-[color:var(--faint)]">{label}</div>
+      <div
+        className="mt-1 font-display text-[1.35rem] font-semibold leading-tight tracking-tight"
+        style={{ color }}
+      >
+        {value}
+      </div>
+      <div className="mt-0.5 text-[length:var(--text-secondary)] text-[color:var(--faint)]">
+        {qualifier}
+      </div>
+      {/* Rationale + provenance fold in here, so the glance value and its
+          backing live in one place rather than a duplicated list below. */}
+      {detail && (
+        <p className="mt-2.5 border-t border-[color:var(--rule)] pt-2.5 text-[13px] leading-relaxed text-[color:var(--slate)]">
+          {detail}
+        </p>
+      )}
+      {hasWhy && (
+        <div className="mt-2">
+          <WhyWeKnow findings={findings!} findingIds={findingIds!} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Section({

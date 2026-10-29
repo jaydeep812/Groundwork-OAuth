@@ -56,7 +56,7 @@ function JourneyStepCard({ step }: { step: JourneyStep }) {
             <h3 className="font-semibold text-[color:var(--ink)]">{step.title}</h3>
             {!step.established && (
               <span
-                className="rounded-full border border-[color:var(--rule-strong)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[color:var(--faint)]"
+                className="rounded-full border border-[color:var(--rule-strong)] px-2 py-0.5 text-[11px] text-[color:var(--faint)]"
                 title="Provider-specific values for this step were not established — confirm in the provider's docs."
               >
                 confirm in docs
@@ -90,7 +90,7 @@ function JourneyStepCard({ step }: { step: JourneyStep }) {
   );
 }
 
-function SnippetTabs({ snippets }: { snippets: CodeSnippet[] }) {
+export function SnippetTabs({ snippets }: { snippets: CodeSnippet[] }) {
   const [active, setActive] = useState(0);
   const current = snippets[active] ?? snippets[0];
   return (

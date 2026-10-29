@@ -6,7 +6,7 @@ export function GuideCard({ guide }: { guide: GuideSummary }) {
   return (
     <Link
       href={`/guides/${guide.slug}`}
-      className="group flex h-full flex-col gap-2.5 rounded-xl border border-[color:var(--rule)] bg-[color:var(--paper-raised)] p-5 transition-colors hover:border-[color:var(--rule-strong)] hover:bg-white"
+      className="group flex h-full flex-col gap-2.5 rounded-xl border border-[color:var(--rule)] bg-[color:var(--paper-raised)] p-5 transition-colors hover:border-[color:var(--verified)] hover:bg-white"
     >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-[1.15rem] font-semibold tracking-tight text-[color:var(--ink)] transition-colors group-hover:text-[color:var(--verified)]">

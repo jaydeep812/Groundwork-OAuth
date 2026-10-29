@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 /*
- * Lab-paper dossier — a light "technical report" surface where verifiability is
- * the visual. Warm paper stock, true near-black ink, hairline warm-grey rules,
- * and a single scarce semantic accent: deep green = evidence-backed / verified.
- *   Display: Fraunces (editorial soft-serif) · Body/UI: IBM Plex Sans · Code: IBM Plex Mono
+ * Groundwork — a warm "technical report" surface where verifiability is the
+ * visual. Warm paper stock, true near-black ink, hairline warm-grey rules, and
+ * a single scarce semantic accent: deep green = evidence-backed / verified.
+ * Type: Geist (one clean geometric sans for everything) · IBM Plex Mono for code.
  */
 
 :root {
-  --paper: #fbfaf7; /* warm report stock (not SaaS white, not AI-cream) */
-  --paper-raised: #f4f2ec; /* subtly recessed panels / code blocks */
-  --ink: #1a1c1f; /* true near-black ink */
-  --slate: #5a5e66; /* secondary ink */
-  --faint: #8c8f96; /* tertiary / captions */
-  --rule: #e4e1d9; /* hairline rules & borders (warm grey) */
-  --rule-strong: #d3cfc4;
+  --paper: #f6f7f6; /* cool near-neutral stock — off-white with a faint cool cast, not warm cream */
+  --paper-raised: #eceeed; /* subtly recessed panels / code blocks */
+  --ink: #171a19; /* true near-black ink, a hair cool */
+  --slate: #51565a; /* secondary ink */
+  --faint: #656a6e; /* tertiary / captions — darkened to clear WCAG AA (4.5:1) on paper and raised panels */
+  --rule: #dde1e0; /* hairline rules & borders (cool grey) */
+  --rule-strong: #ccd1d0;
 
   --verified: #1f6f4a; /* deep green — grounded/confirmed. THE accent. scarce. */
   --verified-soft: #eef4ef; /* green tint for verified chips */
@@ -22,32 +22,50 @@
   --open-soft: #f6efdf;
   --alert: #a3341f; /* rust — blockers (semantic only) */
   --alert-soft: #f6e9e5;
+
+  /* Pale sage for the hero wash — a muted green warmed toward the paper so it
+     reads as atmosphere, not a saturated accent. Used only for the landing
+     hero background; never on cards or semantic UI. */
+  --sage-wash: #e9efe6;
+
+  /* Type scale (desktop) — one system so headings/body/meta stay consistent and
+     meaningfully distinct. Essential guidance never goes below --text-secondary. */
+  --text-title: 2.625rem; /* 42px — page title */
+  --text-section: 1.625rem; /* 26px — section heading */
+  --text-card: 1.125rem; /* 18px — card heading / hero subhead */
+  --text-body: 1rem; /* 16px — body */
+  --text-secondary: 0.875rem; /* 14px — secondary */
+  --text-meta: 0.8125rem; /* 13px — genuinely-secondary metadata only */
+
+  --content-width: 56rem; /* readable max line length for prose/guide body */
 }
 
+
 @theme {
-  /* One clean geometric sans for everything; mono for code only.
-     --font-display is kept as an alias to the sans so any remaining
-     `font-display` utilities resolve correctly after the serif was dropped. */
+  /* Space Grotesk (display) + IBM Plex Sans (body) + IBM Plex Mono (code/data).
+     Each consumes the same-named variable injected on <html> by next/font, with
+     a system fallback chain. `font-display` utilities now resolve to Space
+     Grotesk — a distinct voice from the body sans. */
   --font-sans:
     var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
 
-  /* Remap Tailwind's neutral/white/indigo scales to the lab-paper palette so
+  /* Remap Tailwind's neutral/white/indigo scales to the cool-paper palette so
      existing utility classes render correctly without editing every call site.
      Light surface: low index = light, high index = dark ink. */
   --color-white: #ffffff; /* real white cards sit slightly above paper */
 
-  --color-neutral-50: #faf9f5;
-  --color-neutral-100: #f4f2ec; /* raised panels */
-  --color-neutral-200: #e4e1d9; /* rules / borders */
-  --color-neutral-300: #d3cfc4; /* stronger rules */
-  --color-neutral-400: #8c8f96; /* faint text */
-  --color-neutral-500: #6f7379;
-  --color-neutral-600: #5a5e66; /* secondary ink */
-  --color-neutral-700: #3b3e43; /* body ink */
-  --color-neutral-800: #26282c;
-  --color-neutral-900: #1a1c1f; /* headings / primary ink */
+  --color-neutral-50: #f4f5f4;
+  --color-neutral-100: #eceeed; /* raised panels */
+  --color-neutral-200: #dde1e0; /* rules / borders */
+  --color-neutral-300: #ccd1d0; /* stronger rules */
+  --color-neutral-400: #656a6e; /* faint text — AA-passing (matches --faint) */
+  --color-neutral-500: #6b7074;
+  --color-neutral-600: #565b60; /* secondary ink */
+  --color-neutral-700: #383c3f;
+  --color-neutral-800: #24272a;
+  --color-neutral-900: #171a19; /* headings / primary ink */
 
   /* "indigo" utilities map to the verified-green accent (semantic links/marks). */
   --color-indigo-50: #eef4ef;
@@ -74,12 +92,25 @@ body {
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* The hero wash circle is intentionally wider than the content column; clip
+     horizontal bleed so it never produces a horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 code,
 pre,
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Display face carries the hero + section headings; body prose stays in the
+   humanist sans. h3/h4 (step/card titles) deliberately stay in the body sans so
+   the display voice is reserved for top-level structure, not every heading. */
+.font-display,
+h1,
+h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 :focus-visible {
@@ -92,4 +123,37 @@ pre,
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * Landing hero wash — a very soft, atmospheric sage gradient behind the hero
+ * (headline + description + search). Low-contrast and almost imperceptible at
+ * first glance; it fades to the warm paper before the Library begins. Drawn on
+ * a ::before pseudo-element so no extra markup is needed; clipped so it can
+ * never cause horizontal overflow on mobile.
+ */
+.hero-wash {
+  position: relative;
+  isolation: isolate;
+}
+.hero-wash::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* A large, soft CIRCLE centered over the hero — no boxed edge. The circle is
+     wider/taller than the area it tints, so only its gradual radial falloff is
+     ever visible; the element bounds never show as a hard line. Overflows the
+     section horizontally but the page clips overflow-x, so no scrollbar. */
+  top: -16rem;
+  left: 50%;
+  width: 72rem;
+  height: 44rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--sage-wash) 65%, var(--paper)) 0%,
+    color-mix(in srgb, var(--sage-wash) 28%, var(--paper)) 32%,
+    transparent 58%
+  );
 }
