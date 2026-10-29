@@ -36,14 +36,24 @@ export function reconcileWithLedger(
 
   const applyUrl = (fieldPath: string, key: keyof Implementation) => {
     const f = factFor(facts, fieldPath);
-    if (!f || f.value == null) return;
-    if (f.status === "unknown") return;
-    if (typeof f.value !== "string") return;
-    if (impl[key] !== f.value) {
-      // Only override when the ledger is at least as authoritative as a blank or
-      // a model guess. Endpoints/portal are strings on Implementation.
-      (impl as Record<string, unknown>)[key] = f.value;
-      changed.push(fieldPath);
+    // The ledger always emits a fact for every endpoint field (verified value,
+    // or unknown + not_found_in_retrieved_evidence when deterministic on-domain
+    // extraction found nothing). Two cases:
+    if (f && f.status !== "unknown" && typeof f.value === "string" && f.value) {
+      // (1) Ledger confirmed an endpoint → it's authoritative; apply it.
+      if (impl[key] !== f.value) {
+        (impl as Record<string, unknown>)[key] = f.value;
+        changed.push(fieldPath);
+      }
+      return;
+    }
+    // (2) Ledger looked and did NOT find this endpoint on the provider's own
+    // sources. If the model nonetheless guessed a URL, it is ungrounded — null
+    // it rather than ship a fabricated endpoint (the Fireflies / apis.io bug).
+    // "Only assert an endpoint we actually retrieved" — honest null over guess.
+    if (f && f.status === "unknown" && typeof impl[key] === "string" && impl[key]) {
+      (impl as Record<string, unknown>)[key] = null;
+      changed.push(`${fieldPath} (nulled: model guess not grounded in any retrieved source)`);
     }
   };
 

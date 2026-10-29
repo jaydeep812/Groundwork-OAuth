@@ -91,10 +91,19 @@ export function determineProviderDomains(
 
   const collapsed = providerName.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (!collapsed) return [];
+  // Generic platform words must NOT qualify a domain on their own — e.g. the
+  // token "apis" from "Google APIs" otherwise matched the unrelated apis.io and
+  // got trusted as a Google domain. The full collapsed name ("googleapis") is
+  // still a needle; only the standalone generic fragments are dropped.
+  const GENERIC_TOKENS = new Set([
+    "api", "apis", "app", "apps", "cloud", "dev", "developer", "developers",
+    "docs", "data", "web", "io", "inc", "the", "oauth", "auth", "platform",
+    "connect", "integration", "integrations", "sdk", "console", "portal",
+  ]);
   const tokens = providerName
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 3);
+    .filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t));
   const needles = new Set<string>([collapsed, ...tokens]);
 
   const hostCounts = new Map<string, number>();

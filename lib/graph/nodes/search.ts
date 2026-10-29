@@ -4,7 +4,7 @@ import { determineProviderDomains } from "@/lib/research/helpers";
 import { fetchEndpointEvidence, pickEndpointDocPage } from "@/lib/research/endpoint-extract";
 import { probeOAuthMetadata, type OAuthMetadata } from "@/lib/research/oauth-metadata";
 import { authoritativeHostsFor, canonicalWebsiteFor } from "@/lib/research/provider-registry";
-import { registrableHost } from "@/lib/search/classify";
+import { registrableHost, hostIsOnDomain } from "@/lib/search/classify";
 import { makeFinding, excerpt } from "@/lib/investigation/agents/_shared";
 import type { Finding } from "@/lib/schema/guide";
 
@@ -103,7 +103,26 @@ export async function searchNode(state: GraphStateType): Promise<Partial<GraphSt
 
     try {
       const { meta, attempts } = await probeOAuthMetadata(probeDomains);
-      if (meta) {
+      // Trust guard: a .well-known document is only the PROVIDER's metadata if it
+      // was served from the provider's own domain. Candidate-host resolution can
+      // admit a stray domain (e.g. "Google APIs" → the token "apis" matched the
+      // unrelated apis.io), and a foreign authorization server's issuer validates
+      // against its OWN host — so the issuer check alone can't catch it. Require
+      // the source host to be on a trusted provider domain before we treat its
+      // endpoints as verified; otherwise discard it as if nothing was found.
+      const trustedDomains = [...domains, ...(canonicalHost ? [canonicalHost] : [])];
+      let metaHost: string | null = null;
+      try {
+        metaHost = meta ? new URL(meta.sourceUrl).hostname : null;
+      } catch {
+        metaHost = null;
+      }
+      const metaOnDomain =
+        meta != null &&
+        metaHost != null &&
+        trustedDomains.some((d) => hostIsOnDomain(metaHost as string, d));
+
+      if (meta && metaOnDomain) {
         results = [...results, metadataEvidence(meta)];
         patch.oauthMetadata = meta; // structured — fed into the fact ledger
         const f = makeFinding({
@@ -121,7 +140,10 @@ export async function searchNode(state: GraphStateType): Promise<Partial<GraphSt
       } else {
         // Honest negative note: report the actual outcomes, do NOT manufacture a
         // quote. "Exhausted" is a report of the investigation, not proof of absence.
+        // If we DID parse a document but rejected it for being off the provider's
+        // domain, say so — that's a meaningful (and reassuring) negative.
         const tried = attempts.map((a) => `${a.url} → ${a.reason}`).join("; ");
+        const rejectedForeign = meta != null && !metaOnDomain;
         findings.push(
           makeFinding({
             agent: "oauth-metadata-probe",
@@ -129,8 +151,9 @@ export async function searchNode(state: GraphStateType): Promise<Partial<GraphSt
             attempted: `Probed ${attempts.length} well-known URL(s) across candidate OAuth hosts.`,
             attemptKind: "url-probe",
             outcome: "insufficient",
-            conclusion:
-              attempts.length === 0
+            conclusion: rejectedForeign
+              ? `A metadata document was found at ${metaHost}, but that host is not on the provider's own domain — discarded rather than trusted as the provider's endpoints.`
+              : attempts.length === 0
                 ? "No candidate hosts were available to probe for metadata."
                 : "No valid RFC 8414 / OIDC metadata document was served by the probed hosts.",
             observation: excerpt(tried, 800),

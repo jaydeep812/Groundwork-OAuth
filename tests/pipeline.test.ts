@@ -44,6 +44,28 @@ vi.mock("@/lib/investigation/agents/auth-endpoint-agent", () => ({
 }));
 vi.mock("@/lib/investigation/agents/constraints-agent", () => findingModule("constraints"));
 
+// Mock the deterministic OAuth-metadata probe so the authorize/token endpoints
+// are GROUNDED in a retrieved source (the provider's own .well-known). This lets
+// the test assert the real contract: a fetched endpoint survives reconcile,
+// while a model-guessed endpoint the probe did NOT confirm (revokeUrl here) is
+// nulled rather than shipped as a fabrication.
+vi.mock("@/lib/research/oauth-metadata", () => ({
+  probeOAuthMetadata: vi.fn().mockResolvedValue({
+    meta: {
+      sourceUrl: "https://example.com/.well-known/oauth-authorization-server",
+      issuer: "https://example.com",
+      authorizeUrl: "https://example.com/oauth/authorize",
+      tokenUrl: "https://example.com/oauth/token",
+      registrationUrl: null,
+      revokeUrl: null, // deliberately NOT established → model's guess must be nulled
+      supportedScopes: null,
+      pkceMethods: ["S256"],
+      pkce: "supported",
+    },
+    attempts: [{ url: "https://example.com/.well-known/oauth-authorization-server", ok: true, reason: "metadata" }],
+  }),
+}));
+
 // Use an isolated per-run DB so tests don't pollute the dev database.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -69,7 +91,7 @@ const validModelJson = JSON.stringify({
     authorizeUrl: "https://example.com/oauth/authorize",
     tokenUrl: "https://example.com/oauth/token",
     refreshUrl: null,
-    revokeUrl: null,
+    revokeUrl: "https://example.com/oauth/revoke",
     scopes: [{ name: "read", description: "Read access", required: true }],
     redirectUriRule: "Must be https and exactly match a registered value.",
     pkce: "supported",
@@ -149,8 +171,13 @@ describe("research graph", () => {
       expect(res.guide.status).toBe("generated");
       expect(res.guide.slug).toMatch(/^[a-z0-9-]+$/);
       expect(res.guide.id).toBeTruthy();
-      // Implementation pack survives round-trip.
+      // Implementation pack survives round-trip. authorize/token are GROUNDED
+      // in the metadata probe → kept.
       expect(res.guide.implementation?.authorizeUrl).toBe("https://example.com/oauth/authorize");
+      expect(res.guide.implementation?.tokenUrl).toBe("https://example.com/oauth/token");
+      // revokeUrl was a model GUESS the probe never confirmed → nulled, not
+      // shipped as a fabricated endpoint (the Fireflies / apis.io bug).
+      expect(res.guide.implementation?.revokeUrl).toBeNull();
       expect(res.guide.implementation?.scopes[0]?.name).toBe("read");
       // The five investigator agents each contributed a finding, plus the two
       // deterministic retrieval probes (oauth-metadata-probe + endpoint-extract)

@@ -15,3 +15,6 @@ next-env.d.ts
 # Local agent/skill tooling — not part of the product
 .agents/
 .claude/
+
+# Private working decision log — not for the repo / reviewers
+NOTES-decisions.md
