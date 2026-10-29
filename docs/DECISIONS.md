@@ -8,9 +8,13 @@ Why the MVP looks the way it does.
   specified this family; Server Components let us keep DB and privileged API
   calls off the client with zero ceremony. TypeScript dropped to 5.x because
   Next 15 doesn't yet support the newly released TS 7.
-- **Gemini via `@google/genai` directly.** No AI SDK, no LangGraph, no
-  multi-agent framework — per the brief. One `generateJson` function with a
-  retry and clear error surface.
+- **Gemini via `@langchain/google-genai`, orchestrated with LangGraph.js.**
+  The research runs as one LangGraph `StateGraph` (normalize → plan → search →
+  investigate → synthesize → critic, with a bounded re-plan loop) so recovery
+  and state are explicit rather than ad-hoc. Within it, exactly **one** model
+  call authors facts (synthesis); everything else — five HTTP-probing
+  investigators, the fact ledger, grounding, reconciliation — is deterministic,
+  so the surface area where the model can fabricate is deliberately tiny.
 - **Tavily via raw REST.** A dependency not needed; we have query construction,
   timeouts, result normalization, dedup, and classification in ~140 lines.
 - **SQLite via `better-sqlite3`.** The simplest reliable persistence on a

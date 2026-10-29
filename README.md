@@ -1,165 +1,107 @@
-# Groundwork — OAuth Readiness Guide
+# Groundwork
 
-Helps developers find the shortest viable path from *wanting* an integration to a
-**working, launch-ready OAuth connection**. Enter an unfamiliar provider and the app
-runs live web research and synthesizes a structured, evidence-backed guide —
-separating real developer effort from external waiting, flagging approval
-requirements and blockers, surfacing what you can build with the provider, and
-telling you whether **Composio Managed Auth** may already cover you.
+**An OAuth readiness check for developers building AI-agent integrations.** You're about to wire up a provider's OAuth and you need to know, before you commit: *How hard is this? How long will it take? Will I wait weeks for approval? What's weird about this provider?* Groundwork answers that — for any app, researched live by an agent, with a source behind every claim.
 
-The **guide** is the product. Everything else makes it actionable, verifiable, and
-shareable.
+> Enter a provider → an agent investigates it live → you get a shareable guide that reads as a **readiness verdict**, not a documentation dump.
 
-## What works end to end
+🔗 **Live demo:** _<add your deployed URL>_
 
-- **Investigate (`/investigate`)** — enter a provider (and optionally what you're
-  building). One research pipeline runs live: it probes the provider's own OAuth
-  metadata (RFC 8414 `.well-known`), reads official docs (including `.md`/raw
-  variants), checks the developer portal and Composio's catalog, probes OAuth
-  endpoints read-only (never real credentials), and researches approval, token
-  lifetime, and rate limits. A single model synthesis turns the findings into a
-  guide; a deterministic fact ledger reconciles the OAuth values so every section
-  agrees. Honest errors on failure — research is never faked. ~60–180s.
-- **Guide (`/guides/<slug>`)** — a shareable, tabbed guide:
-  - **Overview** — recommended path, effort vs. external waiting, prerequisites,
-    main blocker, next action, and a **"What can you build?"** capabilities preview.
-  - **Setup** — the one canonical, ordered checklist (with per-step progress saved
-    in the browser) plus the coding-agent handoff brief.
-  - **Technical** — endpoints, scopes (+ the provider's full advertised catalog),
-    PKCE, token lifecycle, rate limits, and a copyable OAuth code walkthrough.
-  - **Evidence** — sources, unresolved questions, and the investigation trace.
-- **Library (`/`)** — searchable list of curated + generated guides.
-- **Persistence** — SQLite (`better-sqlite3`); guides survive refresh and have
-  stable, shareable URLs.
+---
 
-## Tech stack
+## What it does
 
-Next.js 15 (App Router) · TypeScript (strict) · Tailwind CSS v4 · LangGraph.js ·
-Gemini (via `@langchain/google-genai`) · Tavily (REST) · Zod · SQLite
-(`better-sqlite3`) · Vitest.
+- **Readiness verdict first.** Every guide opens with the four things the brief asks a developer to understand — **difficulty · hands-on time · approval wait · launch blockers** — at a glance. Approval + waiting is treated as the crux (it's what turns a 1-hour task into a 3-week one).
+- **"What's different about this provider."** The non-obvious gotchas a developer who already knows OAuth couldn't guess — restricted-scope reviews, single-use refresh tokens, publishing gates — pulled from evidence, not boilerplate.
+- **Honest about confidence.** A provider-published timeline, a community-reported estimate, and an unknown are visibly different. Unknowns are shown as a risk to confirm — never hidden, never faked.
+- **Agent vs. you.** Each guide makes clear what a coding agent can do for you and where a human has to take over, and ships a copy-paste brief to hand your agent.
+- **Live generation.** Submit an app that isn't in the library and an agent researches it in ~1–3 min: it probes the provider's own OAuth metadata, reads official docs, checks endpoints read-only, and hunts for approval/review timelines — then synthesizes a structured, cited guide.
 
-Gemini is the only model provider, and the pipeline makes a single fact-authoring
-model call (synthesis) — everything else (five HTTP-probing investigator agents, the
-fact ledger, grounding, reconciliation, the journey/brief builders) is deterministic.
+## How it answers the assignment
 
-## Setup
+| The developer needs to understand… | Where Groundwork shows it |
+| --- | --- |
+| How easy/hard it is | Difficulty stat in the verdict |
+| Time + effort, incl. approval wait | Hands-on + **Approval wait** stats (the crux) |
+| Requirements & nuances | "What's different about this provider" |
+| What an agent does vs. where you take over | "Your next move" + agent/human split |
+| *(and crucially)* what's verified vs. uncertain | Confidence tier + a "Why we know" source trail on every claim |
 
-Requires Node 20+ (developed on Node 24).
+## What it uses
+
+**Next.js 15** (App Router) · **TypeScript** · **Tailwind v4** · **LangGraph.js** for the research pipeline · **Gemini** for a single fact-authoring synthesis · **Tavily** for web search · **Zod** schema · **SQLite** (`better-sqlite3`) for shareable, persistent guides.
+
+The agent is deliberately disciplined: five HTTP-probing investigators + one model call to synthesize, then a **deterministic fact ledger** reconciles the OAuth values so nothing is hallucinated. Retrieved web content is treated as untrusted data, and the model may not cite a source the pipeline didn't actually retrieve.
+
+## Run it locally
+
+Requires Node 20+.
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in real keys
-npm run seed                 # load curated guides into SQLite
+cp .env.example .env.local   # add your Gemini + Tavily keys
+npm run seed                 # load the curated guide library
 npm run dev                  # http://localhost:3000
 ```
 
-### Environment variables (all server-side)
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | yes | Gemini key (server-side only) |
+| `GEMINI_MODEL` | yes | e.g. `gemini-2.5-flash` |
+| `TAVILY_API_KEY` | yes | Tavily web-search key |
+| `DATABASE_PATH` | no | SQLite path (defaults to `./data/guides.db`) |
 
-| Variable         | Required | Purpose                                             |
-| ---------------- | -------- | --------------------------------------------------- |
-| `GEMINI_API_KEY` | yes      | Google Gemini API key (used only on the server).    |
-| `GEMINI_MODEL`   | yes      | Model id, e.g. `gemini-2.5-flash`. Never hardcoded. |
-| `TAVILY_API_KEY` | yes      | Tavily web-search key (server-side only).           |
-| `DATABASE_PATH`  | no       | SQLite file path. Defaults to `./data/guides.db`.   |
+Missing keys produce a clear setup error — research is never silently faked.
 
-Keys are validated at the service boundary. Missing keys produce a clear setup error
-(the investigate API returns `503` with a message) — research is never silently faked.
+## Deploy
 
-## Commands
+Runs on any Node host with a **persistent disk** (the app writes generated guides to SQLite). On a container host (Railway/Render/Fly), mount a volume and point `DATABASE_PATH` at it, then `npm run seed` once on the server. Serverless/ephemeral filesystems (e.g. Vercel) need `DATABASE_PATH` pointed at durable storage or the `lib/db` layer swapped for a hosted DB — it's isolated for exactly this.
 
-| Command            | What it does                                  |
-| ------------------ | --------------------------------------------- |
-| `npm run dev`      | Dev server.                                   |
-| `npm run build`    | Production build (runs typecheck).            |
-| `npm start`        | Serve the production build.                   |
-| `npm run seed`     | Seed/refresh curated guides.                  |
-| `npm run typecheck`| `tsc --noEmit`.                               |
-| `npm test`         | Vitest unit + integration tests.              |
+---
 
-## Architecture
+<details>
+<summary><strong>Deeper dive</strong> — architecture, pipeline, testing (for the curious)</summary>
 
-Separation of concerns is enforced; privileged operations stay server-side.
-A single **LangGraph** graph runs the research:
+### The research pipeline
+
+One LangGraph graph, with a bounded re-plan loop:
 
 ```
-normalize → plan → search → investigate → synthesize → critic → (re-plan loop | persist)
+normalize → plan → search → investigate → synthesize → critic → (re-plan ×≤2 | persist)
 ```
 
+Everything except the single synthesis call is deterministic: five investigator agents (docs, portal, catalog, auth-endpoint, constraints — all HTTP probes, no LLM), a fact ledger built only from structured signals (RFC 8414 `.well-known`, on-domain doc extraction, live endpoint probes), grounding that drops any fabricated citation, and a completeness critic that drives recovery queries.
+
+### Key modules
+
 ```
-lib/schema/guide.ts          Canonical Guide Zod schema (http(s)-only URL guard;
-                             required SetupStepCategory; optional Implementation pack).
-lib/graph/run.ts             Compiles + runs the StateGraph. runGraph(input).
-lib/graph/state.ts           Shared Annotation.Root state (evidence dedupes by URL;
-                             findings/warnings accumulate). MAX_LOOPS = 2.
-lib/graph/llm.ts             Gemini (via @langchain/google-genai) JSON access.
-lib/graph/{ground,critique}  Grounding walker + deterministic completeness critic.
-lib/graph/nodes/*.ts         normalize, plan, search, investigate, synthesize,
-                             critique, persist.
-lib/research/helpers.ts      Pure: normalizeInput, buildQueries, rankEvidence,
-                             determineProviderDomains.
-lib/research/endpoint-extract.ts
-                             Fetch the top provider-domain doc pages (trying raw
-                             Markdown / `.md` doc variants), regex authorize/token/
-                             revoke URLs (on-domain only).
-lib/research/oauth-metadata.ts
-                             RFC 8414 / OIDC `.well-known` probe over canonical +
-                             common OAuth subdomains; validates the issuer.
-lib/guide/workflow-order.ts  Canonical setup-step ordering + deterministic workflow
-                             validation (authorize-before-exchange, prereqs, etc.).
-lib/search/classify.ts       Honest URL → sourceType. official-docs requires the
-                             host to be on the provider's own domain.
-lib/search/tavily.ts         Tavily client. Per-query retry (429/5xx, Retry-After);
-                             batched concurrency; reclassifyResults re-tags.
-lib/investigation/
-  safe-fetch.ts              SSRF-safe HEAD/GET/errorProbePost (16 KiB cap, short
-                             timeouts, no loopback/private IPs).
-  agents/                    Five HTTP-probing investigator agents (no LLM calls):
-    docs-agent, portal-agent, catalog-agent, auth-endpoint-agent, constraints-agent.
-lib/guide/{oauth-journey,agent-prompt}.ts
-                             Deterministic 7-step walkthrough + coding-agent brief,
-                             built from reconciled facts (no hallucinated endpoints).
-lib/db/guides.ts             SQLite guides table (lazy path → test-isolation safe).
-app/
-  /                          Library + search.
-  /investigate               Intake form (provider + use case).
-  /guides/[slug]             Tabbed guide (Overview / Setup / Technical / Evidence).
-  /api/investigation         The generation endpoint (POST).
+lib/schema/guide.ts        Canonical Guide schema (Zod; http(s)-only URL guard).
+lib/graph/run.ts           Compiles + runs the StateGraph. runGraph(input).
+lib/graph/facts.ts         Deterministic fact ledger (verified > observed > inferred).
+lib/graph/critique.ts      Completeness + consistency critic (drives re-plan).
+lib/search/classify.ts     Honest URL → sourceType; official-docs requires on-domain
+                           host (a provider's own forum counts as community, not docs).
+lib/investigation/agents/  Five HTTP-probing investigators (no LLM calls).
+lib/investigation/safe-fetch.ts  SSRF-safe fetch (no loopback/private IPs, size cap).
+lib/db/guides.ts           SQLite persistence (lazy path → test-isolation safe).
+app/guides/[slug]/          The tabbed guide (Overview / Setup / Technical / Evidence).
+app/api/investigation       Live generation endpoint (POST).
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown (graph
-diagram, node table, trust model, UI hierarchy).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full graph diagram, node table, and trust model, and [docs/DECISIONS.md](docs/DECISIONS.md) for why the stack and product are shaped this way.
 
-Retrieved web content and model output are treated as **untrusted data** — never as
-instructions, and the model may not cite a URL the pipeline did not retrieve (the
-grounding step drops any fabricated source).
+### Testing
 
-## Testing
+`npm test` — **210 tests**, 23 files, fully deterministic (network + LLM mocked, no live calls). Covers the schema, source classification, SSRF guards, RFC 8414 parsing, the fact ledger + reconciliation, canonical setup-step ordering, the approval/waiting evidence rules, and the full pipeline against mocked externals.
 
-`npm test` — **204 tests** across 23 files, all deterministic (network and the LLM
-are mocked; no live calls in CI). Representative coverage:
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run build` | Production build (runs typecheck) |
+| `npm run seed` | Seed/refresh curated guides |
+| `npm test` | Vitest suite |
 
-- **Schema & classification** — `schema`, `classify`, `search`, `util`, `safe-fetch`
-  (SSRF guards: loopback, private, `.local`, dangerous schemes).
-- **Retrieval** — `oauth-metadata` (RFC 8414 parse, issuer validation, candidate
-  hosts), `endpoint-extract` (doc-variant cascade, markdown-URL edge cases),
-  `agents`.
-- **Fact ledger & reconciliation** — `facts`, `reconcile`, `critic-consistency`,
-  `sanitize-draft`.
-- **Workflow correctness** — `workflow-order` (canonical ordering + the
-  authorize-before-exchange dependency validation), `cross-section`,
-  `path-separation`.
-- **Provider regressions** — `providers`, `basecamp`, `bitbucket`.
-- **Pipeline integration** — `pipeline`, `graph`, `graph-deep` (mocked externals),
-  `oauth-journey`, `agent-prompt`.
+### Known limitations
 
-## Deployment
+See `docs/STATUS.md`. Progress tracking is browser-local; curated content reflects public docs as of the research date and should be re-verified before launch; live-generated approval timelines are often community-estimated (and labelled as such).
 
-Runs on any Node host. `better-sqlite3` is a native module and is marked as a server
-external package. For ephemeral/serverless filesystems, point `DATABASE_PATH` at durable
-storage or swap the `lib/db` layer for a hosted database — it is isolated for this reason.
-
-## Known limitations
-
-See `docs/STATUS.md`. Highlights: progress is browser-local (not cross-device);
-Playwright automation is intentionally deferred; curated guide content reflects public
-docs as of the research date and should be re-verified before launch.
+</details>
