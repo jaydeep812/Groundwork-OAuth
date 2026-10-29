@@ -3,8 +3,8 @@ import { FindGuide } from "./find-guide";
 
 export const dynamic = "force-dynamic"; // always read the latest guides from SQLite
 
-export default function HomePage() {
-  const guides = listGuides();
+export default async function HomePage() {
+  const guides = await listGuides();
 
   return (
     <div className="space-y-12">

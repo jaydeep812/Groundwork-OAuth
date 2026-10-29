@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 export default async function GuidePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const guide = getGuideBySlug(slug);
+  const guide = await getGuideBySlug(slug);
   if (!guide) notFound();
 
   const evidenceById = new Map(guide.evidence.map((e) => [e.id, e]));

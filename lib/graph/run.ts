@@ -83,7 +83,7 @@ export async function runGraph(
     };
   }
 
-  const guide = getGuideBySlug(final.slug);
+  const guide = await getGuideBySlug(final.slug);
   if (!guide) {
     return { ok: false, error: "Guide was persisted but could not be read back.", stage: "persist" };
   }

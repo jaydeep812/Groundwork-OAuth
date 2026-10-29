@@ -17,7 +17,7 @@ import { orderSetupSteps } from "@/lib/guide/workflow-order";
  * on the same OAuth values), embed findings + managed-auth metadata, assemble
  * server-controlled fields, validate the full Guide, and persist. Terminal node.
  */
-export function persistNode(state: GraphStateType): Partial<GraphStateType> {
+export async function persistNode(state: GraphStateType): Promise<Partial<GraphStateType>> {
   if (state.error) return {};
   if (!state.draftGuide) {
     return { error: "No guide was produced.", stage: "synthesis" };
@@ -75,7 +75,7 @@ export function persistNode(state: GraphStateType): Partial<GraphStateType> {
 
   const managedAuth = deriveManagedAuth(state.findings);
 
-  const slug = uniqueSlug(slugify(state.draftGuide.providerName || state.providerName));
+  const slug = await uniqueSlug(slugify(state.draftGuide.providerName || state.providerName));
   const now = new Date().toISOString();
 
   // Guard: never persist a providerUrl that doesn't belong to the provider.
@@ -114,15 +114,15 @@ export function persistNode(state: GraphStateType): Partial<GraphStateType> {
   }
 
   try {
-    const saved = upsertGuide(finalParsed.data);
+    const saved = await upsertGuide(finalParsed.data);
     return { slug: saved.slug, warnings };
   } catch (err) {
     return { error: `Failed to persist guide: ${(err as Error).message}`, stage: "persist", warnings };
   }
 }
 
-function uniqueSlug(base: string): string {
+async function uniqueSlug(base: string): Promise<string> {
   const safe = base || "provider";
-  if (!slugExists(safe) && !getGuideBySlug(safe)) return safe;
+  if (!(await slugExists(safe)) && !(await getGuideBySlug(safe))) return safe;
   return `${safe}-${randomId("x").split("_")[1]?.slice(0, 6) ?? "gen"}`;
 }
