@@ -1,26 +1,70 @@
 # Groundwork
 
-Groundwork tells a developer what it takes to set up a provider's OAuth app before they commit to it: how hard it is, how long it'll take, whether there's an approval wait, and the provider-specific details that tend to bite. You can look up a provider from the library or submit one that isn't there yet — an agent researches it live and writes a shareable guide, with a source behind each claim.
+Know what it takes to set up a provider's OAuth app — before you commit to it.
+
+How hard. How long. Whether there's an approval wait. What tends to bite.
+
+Look up a provider from the library, or submit one that isn't there.
+
+An agent researches it live and writes a shareable guide — with a source behind each claim.
 
 Live demo: _add your deployed URL_
 
 ## What it does
 
-A guide opens with a readiness verdict — difficulty, hands-on time, approval wait, and launch blockers — so you can tell a one-hour job from a three-week one at a glance. Approval and waiting get the most weight, since that's usually what turns a quick task into a slow one.
+Every guide opens with a readiness verdict:
 
-Below the verdict, each guide covers:
+- Difficulty
+- Hands-on time
+- Approval wait
+- Launch blockers
 
-- **What's different about this provider** — the non-obvious things a developer who already knows OAuth wouldn't guess: restricted-scope reviews, single-use refresh tokens, publishing gates. Pulled from evidence, not generic OAuth advice.
-- **Your next move** — the first concrete step, and a clear split of what a coding agent can do versus what needs a human. Each guide also ships a copy-paste brief for handing to an agent.
-- **Confidence you can see** — a provider-published timeline, a community-reported estimate, and an unknown look different and are labelled as such. Unknowns show up as a risk to confirm rather than getting hidden or invented.
+Tell a one-hour job from a three-week one at a glance.
 
-Submitting a new provider runs the research live (roughly one to three minutes): it reads the provider's own OAuth metadata, official docs, and developer portal, probes endpoints read-only, and looks for approval timelines, then writes the guide.
+Approval and waiting carry the most weight — that's what usually turns a quick task slow.
+
+Below the verdict:
+
+**What's different about this provider.**
+
+The non-obvious things a developer who knows OAuth wouldn't guess.
+
+Restricted-scope reviews. Single-use refresh tokens. Publishing gates.
+
+From evidence, not generic OAuth advice.
+
+**Your next move.**
+
+The first concrete step.
+
+A clear split of what an agent can do vs. what needs a human.
+
+Plus a copy-paste brief to hand your coding agent.
+
+**Confidence you can see.**
+
+A provider-published timeline, a community estimate, and an unknown all look different — and say so.
+
+Unknowns show up as a risk to confirm. Never hidden. Never invented.
 
 ## Stack
 
-Next.js 15 (App Router), TypeScript, Tailwind v4. The research runs as a LangGraph pipeline using Gemini for a single synthesis step and Tavily for web search. Guides are validated with Zod and stored in SQLite (`better-sqlite3`) so they persist and have shareable URLs.
+- **Next.js 15** (App Router), **TypeScript**, **Tailwind v4**
+- **LangGraph** — the research pipeline
+- **Gemini** — one synthesis step
+- **Tavily** — web search
+- **Zod** — schema validation
+- **SQLite** (`better-sqlite3`) — persistent, shareable guides
 
-The pipeline is deliberately narrow where it matters: one model call authors facts, and everything else — five HTTP-probing investigators, a deterministic fact ledger, grounding, and reconciliation — is code, not model output. Retrieved web content is treated as untrusted, and the model can't cite a source the pipeline didn't actually fetch.
+The pipeline stays narrow where it counts.
+
+One model call authors facts.
+
+Everything else — five HTTP-probing investigators, a deterministic fact ledger, grounding, reconciliation — is code, not model output.
+
+Web content is treated as untrusted.
+
+The model can't cite a source the pipeline didn't actually fetch.
 
 ## Run it locally
 
@@ -40,21 +84,38 @@ Environment variables (all server-side):
 - `TAVILY_API_KEY` — Tavily web-search key (required)
 - `DATABASE_PATH` — SQLite path, defaults to `./data/guides.db` (optional)
 
-Missing keys surface a clear setup error; research is never silently faked.
+Missing keys surface a clear setup error. Research is never silently faked.
 
 ## Deploy
 
-The app writes generated guides to SQLite, so it needs a persistent disk. On a container host (Railway, Render, Fly), mount a volume, point `DATABASE_PATH` at it, and run `npm run seed` once on the server. Serverless hosts with an ephemeral filesystem (Vercel) need `DATABASE_PATH` on durable storage, or the `lib/db` layer swapped for a hosted database — it's isolated behind one module for that reason.
+The app writes guides to SQLite, so it needs a persistent disk.
+
+**Container host** (Railway, Render, Fly):
+
+- Mount a volume
+- Point `DATABASE_PATH` at it
+- Run `npm run seed` once on the server
+
+**Serverless** (Vercel):
+
+- Point `DATABASE_PATH` at durable storage, or swap the `lib/db` layer for a hosted database.
+- It's isolated behind one module for exactly this.
 
 ## How it's built
 
-The research runs as one LangGraph state graph with a bounded re-plan loop:
+The research is one LangGraph state graph with a bounded re-plan loop:
 
 ```
 normalize → plan → search → investigate → synthesize → critic → (re-plan ×≤2 | persist)
 ```
 
-Only the synthesis step calls the model. The five investigators (docs, portal, catalog, auth-endpoint, constraints) are HTTP probes. The fact ledger is built only from structured signals — RFC 8414 `.well-known` metadata, on-domain doc extraction, live endpoint probes — and reconciled over the model's output so OAuth values stay consistent and unhallucinated.
+Only synthesis calls the model.
+
+The five investigators (docs, portal, catalog, auth-endpoint, constraints) are HTTP probes.
+
+The fact ledger is built only from structured signals — RFC 8414 `.well-known` metadata, on-domain doc extraction, live endpoint probes.
+
+It's reconciled over the model's output, so OAuth values stay consistent and unhallucinated.
 
 Notable modules:
 
@@ -72,7 +133,7 @@ app/guides/[slug]/          The guide (Overview / Setup / Technical / Evidence).
 app/api/investigation       Live generation endpoint (POST).
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown and [docs/DECISIONS.md](docs/DECISIONS.md) for why the stack and product are shaped this way.
+More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown, [docs/DECISIONS.md](docs/DECISIONS.md) for the why.
 
 ## Commands
 
@@ -83,4 +144,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full breakdown and [doc
 
 ## Limitations
 
-Progress tracking is browser-local. Curated content reflects public docs as of the research date and should be re-verified before launch. Live-generated approval timelines are often community-estimated, and labelled that way. More in `docs/STATUS.md`.
+- Progress tracking is browser-local.
+- Curated content reflects public docs as of the research date — re-verify before launch.
+- Live-generated approval timelines are often community-estimated, and labelled that way.
+
+More in `docs/STATUS.md`.
