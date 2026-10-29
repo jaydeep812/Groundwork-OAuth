@@ -137,6 +137,16 @@ function isDeveloperSubdomain(host: string): boolean {
   return /^(developers?|dev)\./.test(host.toLowerCase().replace(/^www\./, ""));
 }
 
+/** A provider-hosted COMMUNITY surface (user forum / discussion), e.g.
+ * devforum.zoom.us or community.foo.com. These sit on the provider's own
+ * registrable domain but are user-generated, NOT authoritative documentation —
+ * so they must be tagged "community", never "official-docs", even on-domain. */
+function isCommunitySubdomain(host: string): boolean {
+  return /^(devforum|community|forum|forums|discuss|answers|support-community)\./.test(
+    host.toLowerCase().replace(/^www\./, ""),
+  );
+}
+
 /**
  * Classify a URL. When `providerDomains` is supplied, only hosts matching one
  * of those domains can be "official-docs" or "developer-portal".
@@ -164,6 +174,9 @@ export function classifySource(
   for (const d of providerDomains) {
     if (!d) continue;
     if (hostIsOnDomain(host, d)) {
+      // A provider-hosted user forum is community content, not official docs —
+      // check this BEFORE crediting the on-domain host as authoritative.
+      if (isCommunitySubdomain(host)) return "community";
       return isDeveloperSubdomain(host) ? "developer-portal" : "official-docs";
     }
   }

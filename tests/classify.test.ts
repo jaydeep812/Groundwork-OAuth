@@ -129,3 +129,19 @@ describe("isAuthoritative / label", () => {
     }
   });
 });
+
+describe("community subdomain on the provider's own domain", () => {
+  it("classifies a provider-hosted forum as community, not official-docs", () => {
+    // Regression: devforum.zoom.us was tagged official-docs because it is on the
+    // zoom.us registrable domain — laundering forum content into an
+    // authoritative citation. It must be community.
+    expect(classifySource("https://devforum.zoom.us/t/x/1", ["zoom.us"])).toBe("community");
+    expect(classifySource("https://community.foo.com/post", ["foo.com"])).toBe("community");
+    expect(classifySource("https://discuss.bar.io/q", ["bar.io"])).toBe("community");
+  });
+
+  it("still credits real docs / developer subdomains on the same domain", () => {
+    expect(classifySource("https://developers.zoom.us/docs/x", ["zoom.us"])).toBe("developer-portal");
+    expect(classifySource("https://zoom.us/docs", ["zoom.us"])).toBe("official-docs");
+  });
+});

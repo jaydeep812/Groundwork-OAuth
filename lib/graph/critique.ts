@@ -92,6 +92,24 @@ export function critiqueGuide(guide: GeneratedGuide, facts: NormalizedFact[] = [
     });
   }
 
+  // Approval-wait is the product's crux. If the guide found an approval/
+  // verification requirement but has no external-waiting estimate, that's a gap
+  // worth one more recovery pass — a timeline query is cheap and the answer
+  // (even a community-reported range) is high value. Soft only: `warn` +
+  // not_found_in_retrieved_evidence flows into unresolvedFields to drive a
+  // re-plan, but never hard-fails, so a genuinely-unknown timeline still passes.
+  const hasApproval = (guide.approvalRequirements?.length ?? 0) > 0;
+  const waitingUnknown =
+    !guide.externalWaiting || guide.externalWaiting.kind === "unknown" || guide.externalWaiting.value == null;
+  if (hasApproval && waitingUnknown) {
+    failures.push({
+      fieldPath: "externalWaiting",
+      message: "An approval/verification requirement was found but its turnaround time is not established",
+      reason: "not_found_in_retrieved_evidence",
+      severity: "warn",
+    });
+  }
+
   // --- Semantic consistency against the ledger ---
 
   // (1) Known authoritative facts must not be dropped. If the ledger verified an

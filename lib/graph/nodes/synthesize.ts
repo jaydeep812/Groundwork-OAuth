@@ -122,6 +122,7 @@ export function sanitizeDraft(json: unknown): void {
   normalizeUnits(g);
   repairEstimates(g);
   enforceEstimateHonesty(g);
+  guardOptionalApprovalWait(g);
   coerceNewEnums(g);
 
   // Scopes inside implementation require a name.
@@ -144,6 +145,38 @@ function enforceEstimateHonesty(g: Record<string, unknown>): void {
   if (ae && (ae.kind === "verified" || ae.kind === "observed")) {
     ae.kind = "estimate";
   }
+}
+
+/**
+ * externalWaiting must reflect a wait on the DEVELOPER'S launch path. A
+ * self-serve provider whose only "approval" is an OPTIONAL marketplace listing
+ * or org-owned-app review must not report that review's duration as the
+ * headline wait (the GitHub case: a "1-3 weeks" wait where standard OAuth has
+ * none). Deterministic backstop to the prompt: if NO approvalRequirement is
+ * actually required, the wait doesn't apply to the base integration — clear it
+ * to an honest unknown, regardless of whether the model attached a citation
+ * (a cited duration for an OPTIONAL path is still not a launch wait). A wait is
+ * kept ONLY when a required approval genuinely gates launch.
+ */
+function guardOptionalApprovalWait(g: Record<string, unknown>): void {
+  const w = g.externalWaiting as Record<string, unknown> | undefined;
+  if (!w || w.value == null) return; // already unknown — nothing to guard
+  const reqs = Array.isArray(g.approvalRequirements)
+    ? (g.approvalRequirements as Record<string, unknown>[])
+    : [];
+  // `required` defaults to true in the schema, so treat a missing/undefined
+  // flag as required (don't clear a wait we're unsure about); only an EXPLICIT
+  // `required === false` on every requirement, or no requirements at all, means
+  // the wait is optional-only.
+  const hasRequiredApproval = reqs.some((a) => a && a.required !== false);
+  if (hasRequiredApproval) return; // a mandatory gate → the wait genuinely applies
+  // Optional-only (or no) approval → the wait doesn't apply to the base
+  // integration. Reset to honest unknown rather than report an inflated wait.
+  w.value = null;
+  w.unit = null;
+  w.kind = "unknown";
+  w.rationale =
+    "No mandatory approval wait for the base integration. Any review applies only to optional distribution/listing — confirm if you plan to publish.";
 }
 
 const TRISTATE = new Set(["yes", "no", "unknown"]);

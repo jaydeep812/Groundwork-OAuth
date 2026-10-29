@@ -25,11 +25,18 @@ const FIELD_LABEL: Record<string, string> = {
   "implementation.pkce.supported": "OAuth PKCE code_challenge support",
   "implementation.pkce.required": "whether PKCE is required for OAuth",
   "implementation.redirectUriRule": "OAuth redirect URI requirements",
+  externalWaiting: "OAuth app approval/verification review turnaround time",
 };
 
 /** Turn one unresolved field + reason into a targeted query (strategy varies). */
 export function recoveryQuery(provider: string, fieldPath: string, reason: string): string {
   const label = FIELD_LABEL[fieldPath] ?? fieldPath.split(".").pop() ?? fieldPath;
+  // Approval turnaround time is the exception to "search official docs": the
+  // provider rarely publishes it, so recovery broadens to how-long/community
+  // phrasing rather than forcing an official-docs query that will come back empty.
+  if (fieldPath === "externalWaiting") {
+    return `${provider} OAuth app verification approval how long review time days weeks developers report`;
+  }
   switch (reason) {
     case "source_conflict":
       return `${provider} official documentation ${label} exact value`;

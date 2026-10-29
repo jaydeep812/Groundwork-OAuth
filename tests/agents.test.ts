@@ -132,13 +132,26 @@ describe("docs-agent", () => {
 });
 
 describe("constraints-agent", () => {
-  it("records insufficient when searches return no authoritative hits", async () => {
+  it("records insufficient for on-domain-only topics when only community hits exist, but admits community evidence for the approval-timeline topic (marked as community-reported)", async () => {
     vi.mocked(tavilySearch).mockResolvedValue([
-      { title: "x", url: "https://blog.io/x", content: "", score: 1, sourceType: "community" },
+      { title: "x", url: "https://blog.io/x", content: "Developers report verification takes 2-3 weeks.", score: 1, sourceType: "community" },
     ]);
     const findings = await constraintsAgent(makeCtx());
     expect(findings.length).toBeGreaterThan(0);
-    for (const f of findings) expect(f.outcome).toBe("insufficient");
+
+    // Approval turnaround lives off-domain (forums), so its topic admits the
+    // community hit as "supports" and flags it as community-reported — never
+    // dropping the one datum the product cares most about.
+    const timeline = findings.find((f) => /approval\/verification review take/i.test(f.question));
+    expect(timeline).toBeDefined();
+    expect(timeline!.outcome).toBe("supports");
+    expect(timeline!.uncertainty).toMatch(/community/i);
+
+    // Every other topic stays strict: community-only evidence is insufficient.
+    for (const f of findings) {
+      if (f === timeline) continue;
+      expect(f.outcome).toBe("insufficient");
+    }
   });
 
   it("records supports when at least one authoritative source is found", async () => {

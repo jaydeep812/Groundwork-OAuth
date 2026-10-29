@@ -97,3 +97,53 @@ describe("sanitizeDraft — unit normalization", () => {
     expect((g.activeEffort as Record<string, unknown>).value).toBe(3);
   });
 });
+
+describe("sanitizeDraft — optional-approval wait guard", () => {
+  // Regression (GitHub): a self-serve provider with no mandatory review reported
+  // a "1-3 weeks" externalWaiting sourced from community chatter about OPTIONAL
+  // org/marketplace paths, with no evidence. The base integration has no wait.
+  it("clears an unsupported wait when every approval is optional", () => {
+    const g = base();
+    g.externalWaiting = { kind: "estimate", value: 3, unit: "days", rationale: "community", evidenceIds: [], findingIds: [] };
+    g.approvalRequirements = [
+      { id: "a1", title: "Organization Approval", description: "Optional for org-owned apps", required: false, timeline: null, evidenceIds: [], findingIds: [] },
+    ];
+    sanitizeDraft(g);
+    const w = g.externalWaiting as Record<string, unknown>;
+    expect(w.kind).toBe("unknown");
+    expect(w.value).toBeNull();
+  });
+
+  it("keeps the wait when a required approval exists", () => {
+    const g = base();
+    g.externalWaiting = { kind: "estimate", value: 7, unit: "days", rationale: "r", evidenceIds: [], findingIds: [] };
+    g.approvalRequirements = [
+      { id: "a1", title: "Marketplace Review", description: "Mandatory", required: true, timeline: null, evidenceIds: [], findingIds: [] },
+    ];
+    sanitizeDraft(g);
+    expect((g.externalWaiting as Record<string, unknown>).value).toBe(7);
+  });
+
+  it("clears an optional-path wait even when it carries a citation (a cited duration for an optional path is still not a launch wait)", () => {
+    const g = base();
+    g.externalWaiting = { kind: "estimate", value: 2, unit: "days", rationale: "r", evidenceIds: ["ev-1"], findingIds: ["f1"] };
+    g.approvalRequirements = [
+      { id: "a1", title: "App Review", description: "Optional", required: false, timeline: null, evidenceIds: [], findingIds: [] },
+    ];
+    sanitizeDraft(g);
+    const w = g.externalWaiting as Record<string, unknown>;
+    expect(w.kind).toBe("unknown");
+    expect(w.value).toBeNull();
+  });
+
+  it("keeps the wait when the required flag is absent (schema defaults required=true; don't clear what we're unsure about)", () => {
+    const g = base();
+    g.externalWaiting = { kind: "estimate", value: 5, unit: "days", rationale: "r", evidenceIds: [], findingIds: [] };
+    g.approvalRequirements = [
+      // No `required` key — schema default is true, so this is a gate; keep the wait.
+      { id: "a1", title: "Verification", description: "Review", timeline: null, evidenceIds: [], findingIds: [] },
+    ];
+    sanitizeDraft(g);
+    expect((g.externalWaiting as Record<string, unknown>).value).toBe(5);
+  });
+});

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import type {
-  ExecutionMode,
   Finding,
   Guide,
   Implementation,
@@ -89,14 +88,6 @@ const STATUS_TONE: Record<ProgressStatus, Parameters<typeof Badge>[0]["tone"]> =
 };
 
 const CYCLE: ProgressStatus[] = ["not-started", "in-progress", "completed", "unverified", "blocked"];
-
-/** Ownership derived from the step's executionMode. Compact label + who-acts,
- * so responsibility is clear without another paragraph per step. */
-const OWNERSHIP: Record<ExecutionMode, { label: string; help: string }> = {
-  manual: { label: "You do this", help: "A human must complete this in the provider's portal or console." },
-  "agent-assisted": { label: "Agent can help", help: "A coding agent can draft or implement this with you in the loop." },
-  automatable: { label: "Agent can help", help: "This can be generated or automated — review before shipping." },
-};
 
 function storageKey(guideId: string) {
   return `oauth-guide-progress:${guideId}`;
@@ -334,11 +325,6 @@ function StepCard({
   const done = status === "completed";
   const blocked = status === "blocked";
 
-  // Required, user-supplied fields are the one piece of config a developer must
-  // see before acting — surface them compactly in the default view. Everything
-  // else (optional fields, provider-issued values) stays in Details.
-  const essentialFields = step.fields.filter((f) => f.required && f.provenance !== "provider-issued");
-
   // Progressive disclosure. The first actionable step opens by default; the rest
   // start collapsed to a scannable summary. "View code" actions also open the
   // panel (and we scroll the reader to the code within it).
@@ -347,27 +333,16 @@ function StepCard({
     setOpen(defaultOpen);
   }, [defaultOpen]);
 
-  // Detail content that lives behind the toggle. Code and the essential-field
-  // Keep only the free-text notes a fluent developer actually benefits from.
-  // Rationale is the first to go: it's almost always generic OAuth restatement,
-  // so it shows ONLY when it names something provider-specific. Troubleshooting
-  // likewise survives only when it names a real error/location, not "re-check
-  // your values". Verification is the one light scaffold we keep unconditionally
-  // (as a terse one-liner), since a completion criterion helps every reader.
   const showRationale = isWorthShowing(step.rationale, true);
   const showRecovery = isWorthShowing(step.recovery);
   const verificationLine = step.verification || step.expectedOutcome;
-  const extraFields = step.fields.filter((f) => !essentialFields.includes(f));
 
-  // Detail content that lives behind the toggle — only what survived the filter.
-  const hasDetail =
-    showRationale ||
-    showRecovery ||
-    extraFields.length > 0 ||
-    snippets.length > 0 ||
-    findingIds.length > 0;
-
-  const own = OWNERSHIP[step.executionMode];
+  // Config fields are now lightweight checklist lines shown INLINE — they don't
+  // gate a toggle. The toggle exists ONLY for genuinely heavy content: code
+  // snippets or provider-specific rationale. Evidence ("Why: …") is a quiet
+  // inline affordance, not heavy content, so it never justifies a toggle on its
+  // own. If there's nothing heavy, there's no toggle at all.
+  const hasHeavyDetail = snippets.length > 0 || showRationale;
 
   return (
     <li
@@ -391,13 +366,12 @@ function StepCard({
             <h4 className="text-[1.0625rem] font-semibold leading-snug text-[color:var(--ink)]">
               {step.title}
             </h4>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <span className="text-[11px] font-medium text-[color:var(--faint)]" title={own.help}>
-                {own.label}
-              </span>
-              {!step.required && <Badge tone="neutral">optional</Badge>}
-              {step.appliesWhen && <Badge tone="amber">conditional</Badge>}
-            </div>
+            {(!step.required || step.appliesWhen) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                {!step.required && <Badge tone="neutral">optional</Badge>}
+                {step.appliesWhen && <Badge tone="amber">conditional</Badge>}
+              </div>
+            )}
           </div>
         </div>
         <button
@@ -410,21 +384,34 @@ function StepCard({
         </button>
       </div>
 
-      {/* The one-line task. Concise by construction (seed instructions are short);
-          the full step-by-step lives under Details. */}
+      {/* One tight block: title, then a single short paragraph that weaves in
+          the instruction, how-you-know-it-worked, and any real gotcha — as
+          plain sentences, no labeled compartments. Action button + optional
+          code follow. Nothing else. */}
       <div className="mt-2.5 pl-9">
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-[color:var(--ink)]">
           {step.instructions}
+          {verificationLine ? ` You're done when ${lowerFirst(verificationLine)}` : ""}
+          {showRecovery ? ` If it fails: ${lowerFirst(step.recovery)}` : ""}
         </p>
 
-        {/* Conditional applicability is a gate on the action — show it inline. */}
         {step.appliesWhen && (
           <p className="mt-2 text-[13px] leading-relaxed text-[color:var(--open)]">
-            <span className="font-medium">Applies when:</span> {step.appliesWhen}
+            Only if {lowerFirst(step.appliesWhen)}
           </p>
         )}
 
-        {/* Primary action + essential config live right under the instruction. */}
+        {/* Config the developer needs — inline checklist lines, always visible
+            (they're short; no toggle, no box). */}
+        {step.fields.length > 0 && (
+          <div className="mt-2.5 space-y-1">
+            {step.fields.map((f) => (
+              <FieldRow key={f.id} field={f} compact />
+            ))}
+          </div>
+        )}
+
+        {/* Action + optional code/details toggle. */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {action?.kind === "external" && (
             <a
@@ -438,97 +425,42 @@ function StepCard({
               <span className="sr-only">(opens in a new tab)</span>
             </a>
           )}
-          {action?.kind === "reveal-code" && snippets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-[color:var(--ink)] px-3.5 py-2 text-[13px] font-medium text-[color:var(--paper)] transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--verified)]"
-              aria-expanded={open}
-            >
-              {action.label}
-              <span aria-hidden>↓</span>
-            </button>
-          )}
-          {hasDetail && (
+          {/* One toggle, only when there's genuinely heavy content behind it
+              (code or provider-specific rationale). "View code" when code is the
+              payload, else "Details". No toggle for thin steps. */}
+          {hasHeavyDetail && (
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-md border border-[color:var(--rule-strong)] px-3 py-2 text-[13px] text-[color:var(--slate)] transition-colors hover:border-[color:var(--faint)] hover:text-[color:var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--verified)]"
+              className={
+                snippets.length > 0
+                  ? "inline-flex items-center gap-1.5 rounded-md bg-[color:var(--ink)] px-3.5 py-2 text-[13px] font-medium text-[color:var(--paper)] transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--verified)]"
+                  : "inline-flex items-center gap-1 rounded-md border border-[color:var(--rule-strong)] px-3 py-2 text-[13px] text-[color:var(--slate)] transition-colors hover:border-[color:var(--faint)] hover:text-[color:var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--verified)]"
+              }
               aria-expanded={open}
             >
-              {open ? "Hide details" : "Details"}
-              <span aria-hidden>{open ? "▴" : "▾"}</span>
+              {snippets.length > 0 ? (open ? "Hide code" : "View code") : open ? "Less" : "Details"}
+              <span aria-hidden>{open ? "▴" : snippets.length > 0 ? "↓" : "▾"}</span>
             </button>
           )}
         </div>
 
-        {/* Essential, user-provided config — compact rows, always visible. */}
-        {essentialFields.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-1.5 text-[12px] font-semibold text-[color:var(--slate)]">
-              Required configuration
-            </div>
-            <div className="space-y-1.5">
-              {essentialFields.map((f) => (
-                <FieldRow key={f.id} field={f} compact />
-              ))}
-            </div>
+        {/* Provenance — a quiet inline affordance, always available, never
+            gating a toggle. */}
+        {findingIds.length > 0 && (
+          <div className="mt-2.5">
+            <WhyWeKnow findings={findings} findingIds={findingIds} />
           </div>
-        )}
-
-        {/* The one light scaffold we keep for every reader: a terse "done when"
-            criterion. No section header, no essay — one quiet line with a check. */}
-        {verificationLine && (
-          <p className="mt-3 flex items-start gap-1.5 text-[13px] leading-relaxed text-[color:var(--slate)]">
-            <span className="mt-px shrink-0 text-[color:var(--verified)]" aria-hidden>
-              ✓
-            </span>
-            <span>
-              <span className="sr-only">Done when: </span>
-              {verificationLine}
-            </span>
-          </p>
         )}
       </div>
 
-      {/* Progressive disclosure: only the depth that survived the "would a
-          developer who knows OAuth actually need this?" filter. */}
-      {open && hasDetail && (
-        <div className="mt-4 space-y-4 border-t border-[color:var(--rule)] pl-9 pt-4 text-sm">
-          {/* Remaining config fields (optional / provider-issued). */}
-          {extraFields.length > 0 && (
-            <Detail label="Configuration">
-              <div className="space-y-1.5">
-                {extraFields.map((f) => (
-                  <FieldRow key={f.id} field={f} />
-                ))}
-              </div>
-            </Detail>
-          )}
+      {/* Heavy detail on demand — no section headers, just the content. */}
+      {open && hasHeavyDetail && (
+        <div className="mt-4 space-y-3 border-t border-[color:var(--rule)] pl-9 pt-4 text-sm">
+          {snippets.length > 0 && <SnippetTabs snippets={snippets} />}
 
-          {snippets.length > 0 && (
-            <Detail label="Code for this step">
-              <SnippetTabs snippets={snippets} />
-            </Detail>
-          )}
-
-          {/* Troubleshooting — ONLY when it names a real error/location, not
-              generic "re-check your values" advice. */}
-          {showRecovery && (
-            <Detail label="Troubleshooting" tone="alert">
-              {step.recovery}
-            </Detail>
-          )}
-
-          {/* Rationale — kept ONLY when provider-specific; generic "why OAuth
-              works" restatement is dropped entirely. */}
-          {showRationale && <Detail label="Why this matters">{step.rationale}</Detail>}
-
-          {/* Evidence provenance — unobtrusive, below a rule of its own. */}
-          {findingIds.length > 0 && (
-            <div className="border-t border-[color:var(--rule)] pt-3">
-              <WhyWeKnow findings={findings} findingIds={findingIds} />
-            </div>
+          {showRationale && (
+            <p className="leading-relaxed text-[color:var(--slate)]">{step.rationale}</p>
           )}
         </div>
       )}
@@ -536,29 +468,15 @@ function StepCard({
   );
 }
 
-/** A labelled block inside the Details disclosure. Small, quiet label; readable
- * near-ink body. `tone="alert"` tints the label for troubleshooting. */
-function Detail({
-  label,
-  tone = "default",
-  children,
-}: {
-  label: string;
-  tone?: "default" | "alert";
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div
-        className={`text-[12px] font-semibold ${
-          tone === "alert" ? "text-[color:var(--alert)]" : "text-[color:var(--slate)]"
-        }`}
-      >
-        {label}
-      </div>
-      <div className="mt-1 whitespace-pre-wrap leading-relaxed text-[color:var(--ink)]">{children}</div>
-    </div>
-  );
+/** Lowercase the first character so a sentence reads naturally when spliced
+ * after "You're done when" / "If it fails:" / "Only if". Leaves ALL-CAPS words
+ * (acronyms, error codes like PKCE / redirect_uri) untouched. */
+function lowerFirst(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  // Don't lowercase if the first token is an acronym/identifier (2+ caps).
+  if (/^[A-Z]{2,}/.test(t) || /^[a-z_]+_[a-z_]+/.test(t)) return t;
+  return t.charAt(0).toLowerCase() + t.slice(1);
 }
 
 const PROVENANCE_LABEL: Record<ValueProvenance, string> = {
@@ -567,58 +485,41 @@ const PROVENANCE_LABEL: Record<ValueProvenance, string> = {
   "provider-issued": "Provider issues",
 };
 
-const PROVENANCE_HELP: Record<ValueProvenance, string> = {
-  "developer-input": "You choose this value (e.g. app name).",
-  "environment-derived": "Comes from your own app (e.g. redirect URI = where your app serves OAuth callbacks).",
-  "provider-issued": "The provider issues this after registration (e.g. client ID). Never store secrets in this guide.",
-};
-
 /**
- * A single configuration field as a compact row — not a bordered table cell.
- * Shows name, who supplies it, required/optional, a one-line expected value,
- * and a copy action ONLY when a real value exists. When no value is supplied,
- * the placeholder is unmistakable ("you provide this") — never fabricated.
+ * A single configuration field as a checklist line — a quiet mark + the field
+ * name + who supplies it, inline. Not a bordered code box. The copyable value
+ * appears only when one genuinely exists; otherwise the provenance says who
+ * supplies it, never a fabricated value.
  */
 function FieldRow({ field: f, compact }: { field: SetupField; compact?: boolean }) {
-  const provenanceTone = f.provenance === "provider-issued" ? "amber" : "slate";
+  const who = PROVENANCE_LABEL[f.provenance].toLowerCase();
   return (
-    <div className="rounded-md border border-[color:var(--rule)] bg-[color:var(--paper-raised)]/60 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <code className="font-mono text-[13px] font-medium text-[color:var(--ink)]">{f.label}</code>
-        <Badge tone={provenanceTone} title={PROVENANCE_HELP[f.provenance]}>
-          {PROVENANCE_LABEL[f.provenance]}
-        </Badge>
-        {!f.required && <Badge tone="neutral">optional</Badge>}
+    <div className="flex items-start gap-2 text-[13px] leading-relaxed">
+      <span className="mt-[3px] shrink-0 text-[color:var(--faint)]" aria-hidden>
+        ◦
+      </span>
+      <div className="min-w-0">
+        <span>
+          <code className="font-mono font-medium text-[color:var(--ink)]">{f.label}</code>
+          <span className="text-[color:var(--faint)]">
+            {" — "}
+            {who}
+            {!f.required ? ", optional" : ""}
+          </span>
+        </span>
+        {f.description && !compact && (
+          <span className="text-[color:var(--slate)]"> · {f.description}</span>
+        )}
+        {f.suggestedValue ? (
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            <code className="min-w-0 truncate rounded bg-[color:var(--paper-raised)] px-2 py-0.5 font-mono text-xs text-[color:var(--ink)]">
+              {f.suggestedValue}
+            </code>
+            <CopyButton value={f.suggestedValue} label="Copy" />
+            <span className="text-[11px] text-[color:var(--faint)]">verify before use</span>
+          </span>
+        ) : null}
       </div>
-
-      {/* One-line expected value — only in the fuller (non-compact) rows, or when
-          there's a copyable value to anchor. */}
-      {f.description && !compact && (
-        <p className="mt-1 text-[13px] leading-relaxed text-[color:var(--slate)]">{f.description}</p>
-      )}
-
-      {f.suggestedValue ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <code className="min-w-0 truncate rounded bg-[color:var(--paper-raised)] px-2 py-1 font-mono text-xs text-[color:var(--ink)]">
-            {f.suggestedValue}
-          </code>
-          <CopyButton value={f.suggestedValue} label="Copy value" />
-          <span className="text-[11px] text-[color:var(--faint)]">verify before use</span>
-        </div>
-      ) : (
-        // No fabricated value. The badge already says who supplies it; add an
-        // explicit placeholder only for environment-derived fields, where "you
-        // supply this from your own app" isn't self-evident.
-        f.provenance === "environment-derived" && (
-          <p className="mt-1 text-[11px] italic text-[color:var(--faint)]">
-            No value yet — you supply this from your app configuration.
-          </p>
-        )
-      )}
-
-      {f.validation && !compact && (
-        <p className="mt-1 text-[11px] text-[color:var(--faint)]">Validation: {f.validation}</p>
-      )}
     </div>
   );
 }

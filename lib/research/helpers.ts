@@ -48,7 +48,7 @@ export function buildQueries(provider: string): string[] {
     `${provider} OAuth app setup developer documentation`,
     `${provider} register OAuth application client id redirect URI`,
     `${provider} OAuth scopes permissions API`,
-    `${provider} OAuth app verification or production approval requirements`,
+    `${provider} OAuth app verification or production approval requirements how long review time`,
     `${provider} developer portal official documentation`,
   ];
 }

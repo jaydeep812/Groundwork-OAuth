@@ -5,7 +5,6 @@ import type { Guide } from "@/lib/schema/guide";
 import {
   Badge,
   ClaimKindBadge,
-  DifficultyBadge,
   PathBadge,
   SourceBadge,
   formatEstimate,
@@ -81,6 +80,7 @@ function OverviewPanel({
   return (
     <>
       <HeroSummary guide={guide} mainBlocker={mainBlocker} />
+      <ProviderNuances guide={guide} />
       {composioToolkitUrl && (
         <ManagedAuthCallout providerName={guide.providerName} toolkitUrl={composioToolkitUrl} />
       )}
@@ -93,6 +93,102 @@ function OverviewPanel({
         />
       )}
     </>
+  );
+}
+
+/**
+ * "What's different about this provider" — the nuances a developer who already
+ * knows OAuth could NOT guess, pulled from structured evidence (not prose). This
+ * is the heart of the readiness framing: a developer scans this to learn how
+ * THIS provider's OAuth deviates from the flow they already know. Each item is a
+ * real requirement/gotcha, tier-ordered (blocker → approval → protocol quirk).
+ * Honest-empty: if nothing unusual was established, it says so — and distinguishes
+ * "assessed, standard OAuth" from "not fully assessed".
+ */
+function ProviderNuances({ guide }: { guide: Guide }) {
+  type Nuance = { tone: "alert" | "open" | "default"; label: string; detail: string };
+  const items: Nuance[] = [];
+  const impl = guide.implementation;
+
+  // Launch blockers — the sharpest gotchas.
+  for (const b of guide.knownBlockers) {
+    items.push({ tone: "alert", label: b.title, detail: b.description });
+  }
+  // Approval / verification gates — the crux. Only when actually required or scope-gated.
+  for (const a of guide.approvalRequirements) {
+    if (!a.required) continue;
+    items.push({
+      tone: "open",
+      label: a.title,
+      detail: a.timeline ? `${a.description} (timeline: ${formatEstimate(a.timeline)})` : a.description,
+    });
+  }
+  // Protocol quirks a developer must get right for THIS provider.
+  if (impl?.pkce === "required") {
+    items.push({
+      tone: "default",
+      label: "PKCE is mandatory",
+      detail: "This provider requires PKCE on the authorization code flow — a plain code exchange will be rejected.",
+    });
+  }
+  if (impl?.tokenLifecycle?.refreshTokenSingleUse === "yes" || impl?.tokenLifecycle?.refreshTokenRotates === "yes") {
+    items.push({
+      tone: "default",
+      label: "Refresh tokens are single-use",
+      detail: "Each refresh returns a new refresh token; store the new one and discard the old, or the next refresh fails.",
+    });
+  }
+  if (impl?.appReadiness?.distribution) {
+    items.push({
+      tone: "open",
+      label: "App must be published to be used by others",
+      detail: impl.appReadiness.distribution,
+    });
+  }
+
+  const assessed = guide.blockerAssessment === "assessed-none-found";
+
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-[1.3rem] font-semibold tracking-tight text-[color:var(--ink)]">
+        What&apos;s different about {guide.providerName}
+      </h2>
+      {items.length === 0 ? (
+        <p className="rounded-md border border-[color:var(--rule)] bg-[color:var(--paper-raised)] px-4 py-3 text-sm leading-relaxed text-[color:var(--slate)]">
+          {assessed
+            ? "Nothing unusual found — this provider follows a standard OAuth flow with no approval gate or special requirements established."
+            : "No provider-specific requirements were established from the evidence. This doesn't mean there are none — confirm scope/approval rules in the provider's docs before launch."}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((n, i) => (
+            <li
+              key={i}
+              className={`rounded-md border-l-2 px-4 py-3 ${
+                n.tone === "alert"
+                  ? "border-[color:var(--alert)] bg-[color:var(--alert-soft)]"
+                  : n.tone === "open"
+                    ? "border-[color:var(--open)] bg-[color:var(--open-soft)]"
+                    : "border-[color:var(--rule-strong)] bg-[color:var(--paper-raised)]"
+              }`}
+            >
+              <div
+                className={`text-[15px] font-medium ${
+                  n.tone === "alert"
+                    ? "text-[color:var(--alert)]"
+                    : n.tone === "open"
+                      ? "text-[color:var(--open)]"
+                      : "text-[color:var(--ink)]"
+                }`}
+              >
+                {n.label}
+              </div>
+              <p className="mt-0.5 text-[14px] leading-relaxed text-[color:var(--slate)]">{n.detail}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -347,7 +443,8 @@ function Header({ guide }: { guide: Guide }) {
       </p>
       <div className="flex flex-wrap gap-2">
         <PathBadge path={guide.recommendedPath} />
-        <DifficultyBadge rating={guide.difficulty.rating} />
+        {/* Difficulty now leads the readiness verdict in Overview, so it's no
+            longer repeated as a header badge. */}
         <Badge tone="neutral">
           Last researched {new Date(guide.lastResearchedAt).toLocaleDateString()}
         </Badge>
@@ -378,33 +475,72 @@ function HeroSummary({
           the depth live in ONE place (no duplicate definition list below). */}
       <VerdictRow guide={guide} mainBlocker={mainBlocker} />
 
-      {guide.nextAction && (
-        <div className="rounded-md border-l-2 border-[color:var(--verified)] bg-[color:var(--verified-soft)] px-4 py-3">
-          <p className="text-[13px] text-[color:var(--verified)]">Start here</p>
-          <p className="mt-1 text-[15px] leading-relaxed text-[color:var(--ink)]">
-            <Linkify text={guide.nextAction} />
-          </p>
-        </div>
-      )}
-
-      {/* Primary action — jumps to the setup checklist. */}
-      <div>
-        <a
-          href="#setup"
-          className="inline-flex items-center rounded-md bg-[color:var(--ink)] px-5 py-2.5 text-[15px] font-medium text-[color:var(--paper)] transition-colors hover:bg-black"
-        >
-          Start setup →
-        </a>
-      </div>
+      {/* Your next move — completes the decision IN the overview: what to do
+          first, who does it (agent vs. you), then the link to execute. The
+          developer leaves this panel knowing the move and the ownership, so the
+          Setup tab is pure execution rather than where they first learn it. */}
+      <NextMove guide={guide} />
     </section>
   );
 }
 
 /**
- * At-a-glance verdict: three stat blocks answering "how long is this, how long
- * will the provider make me wait, and what could block launch" — the dev's
- * first three questions, legible in one glance. Each block names the claim kind
- * (verified / estimate / unknown) so the confidence is never hidden.
+ * The decide→act hand-off. Answers the brief's "know what to do next" AND "what
+ * an agent can do vs. where you take over" together, at the point of decision,
+ * so neither is stranded in another tab.
+ */
+function NextMove({ guide }: { guide: Guide }) {
+  const agentDoes = guide.agentCapabilities[0];
+  const youDo = guide.humanHandoff[0];
+  const hasSplit = Boolean(agentDoes || youDo);
+  return (
+    <div className="rounded-lg border border-[color:var(--rule)] bg-[color:var(--paper-raised)] p-5">
+      <p className="font-display text-[1.05rem] font-semibold tracking-tight text-[color:var(--ink)]">
+        Your next move
+      </p>
+      {guide.nextAction && (
+        <p className="mt-1.5 text-[15px] leading-relaxed text-[color:var(--ink)]">
+          <Linkify text={guide.nextAction} />
+        </p>
+      )}
+
+      {/* Who does what — the brief's agent-vs-human point, as one scannable line
+          each, not a buried mid-Setup section. */}
+      {hasSplit && (
+        <dl className="mt-3 space-y-1.5 border-t border-[color:var(--rule)] pt-3 text-[14px] leading-relaxed">
+          {agentDoes && (
+            <div className="flex gap-2">
+              <dt className="shrink-0 font-medium text-[color:var(--verified)]">Agent can:</dt>
+              <dd className="text-[color:var(--slate)]">{agentDoes}</dd>
+            </div>
+          )}
+          {youDo && (
+            <div className="flex gap-2">
+              <dt className="shrink-0 font-medium text-[color:var(--ink)]">You must:</dt>
+              <dd className="text-[color:var(--slate)]">{youDo}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      <a
+        href="#setup"
+        className="mt-4 inline-flex items-center rounded-md bg-[color:var(--ink)] px-5 py-2.5 text-[15px] font-medium text-[color:var(--paper)] transition-colors hover:bg-black"
+      >
+        Start setup →
+      </a>
+    </div>
+  );
+}
+
+/**
+ * At-a-glance readiness verdict — the four questions a developer asks before
+ * committing: how hard is this, how much hands-on time, will the provider make
+ * me wait for approval, and could anything block launch. Approval + waiting is
+ * the crux (what turns a 1-hour task into a 3-week one), so the approval stat
+ * distinguishes "no approval needed" (good) from "approval required, timeline
+ * not established" (a risk to confirm) — never collapsing both to "None found".
+ * Each block names its confidence so uncertainty is never hidden.
  */
 function VerdictRow({
   guide,
@@ -416,15 +552,6 @@ function VerdictRow({
   const effort = guide.activeEffort;
   const waiting = guide.externalWaiting;
 
-  const blocker =
-    mainBlocker != null
-      ? { value: "Review needed", qualifier: "blocker", tone: "alert" as const }
-      : guide.blockerAssessment === "assessed-none-found"
-        ? { value: "Clear", qualifier: "assessed", tone: "verified" as const }
-        : { value: "Unverified", qualifier: "check docs", tone: "open" as const };
-
-  const waitingUnknown = waiting.kind === "unknown" || waiting.value == null;
-
   const toneColor = (t: "ink" | "verified" | "open" | "alert") =>
     t === "verified"
       ? "var(--verified)"
@@ -434,8 +561,57 @@ function VerdictRow({
           ? "var(--alert)"
           : "var(--ink)";
 
+  // Difficulty leads the verdict (no longer only a header badge).
+  const difficulty = guide.difficulty;
+  const difficultyTone =
+    difficulty.rating === "easy"
+      ? "verified"
+      : difficulty.rating === "hard"
+        ? "alert"
+        : difficulty.rating === "moderate"
+          ? "open"
+          : "ink";
+  const difficultyValue =
+    difficulty.rating === "unknown"
+      ? "Not established"
+      : difficulty.rating.charAt(0).toUpperCase() + difficulty.rating.slice(1);
+
+  // Approval wait — the crux. A required approval with no established timeline is
+  // a RISK, not an absence. Only "no approval requirement found" is reassuring.
+  const requiredApproval = guide.approvalRequirements.find((a) => a.required) ?? guide.approvalRequirements[0];
+  const waitingKnown = !(waiting.kind === "unknown" || waiting.value == null);
+  const approval = waitingKnown
+    ? { value: formatEstimate(waiting), qualifier: `provider review · ${waiting.kind}`, tone: "open" as const }
+    : requiredApproval
+      ? { value: "Review required", qualifier: "timeline not established", tone: "open" as const }
+      : { value: "None found", qualifier: "no review requirement", tone: "verified" as const };
+  // Prefer the approval requirement's own rationale/findings when the aggregate
+  // waiting estimate is empty, so the stat still shows its basis.
+  const approvalDetail = waitingKnown
+    ? waiting.rationale
+    : requiredApproval?.description ?? waiting.rationale;
+  const approvalFindingIds = waitingKnown
+    ? waiting.findingIds ?? []
+    : requiredApproval?.findingIds ?? waiting.findingIds ?? [];
+
+  const blocker =
+    mainBlocker != null
+      ? { value: "Review needed", qualifier: "blocker found", tone: "alert" as const }
+      : guide.blockerAssessment === "assessed-none-found"
+        ? { value: "Clear", qualifier: "assessed", tone: "verified" as const }
+        : { value: "Unverified", qualifier: "not fully assessed", tone: "open" as const };
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <VerdictStat
+        label="Difficulty"
+        value={difficultyValue}
+        qualifier={difficulty.rating === "unknown" ? "not established" : "overall effort"}
+        color={toneColor(difficultyTone)}
+        detail={difficulty.rationale}
+        findings={guide.findings}
+        findingIds={difficulty.findingIds ?? []}
+      />
       <VerdictStat
         label="Hands-on time"
         value={formatEstimate(effort)}
@@ -447,12 +623,12 @@ function VerdictRow({
       />
       <VerdictStat
         label="Approval wait"
-        value={waitingUnknown ? "None found" : formatEstimate(waiting)}
-        qualifier={waitingUnknown ? "assessed" : waiting.kind}
-        color={toneColor(waitingUnknown ? "verified" : "ink")}
-        detail={waiting.rationale}
+        value={approval.value}
+        qualifier={approval.qualifier}
+        color={toneColor(approval.tone)}
+        detail={approvalDetail}
         findings={guide.findings}
-        findingIds={waiting.findingIds ?? []}
+        findingIds={approvalFindingIds}
       />
       <VerdictStat
         label="Launch blockers"
